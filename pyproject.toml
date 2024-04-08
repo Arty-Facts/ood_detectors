@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ood_detectors"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "apache-2.0"
+keywords = []
+authors = [
+  { name = "Arturas Aleksandraus", email = "arturas@aleksandraus.se" },
+  { name = "Yifan Ding", email = "yifan.ding@liu.se" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/Arty-Facts/ood_detectors#readme"
+Issues = "https://github.com/Arty-Facts/ood_detectors/issues"
+Source = "https://github.com/Arty-Facts/ood_detectors"
+
+[tool.hatch.version]
+path = "src/ood_detectors/__about__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "coverage[toml]>=6.5",
+  "pytest",
+]
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov = [
+  "test-cov",
+  "cov-report",
+]
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/ood_detectors tests}"
+
+[tool.coverage.run]
+source_pkgs = ["ood_detectors", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/ood_detectors/__about__.py",
+]
+
+[tool.coverage.paths]
+ood_detectors = ["src/ood_detectors", "*/ood_detectors/src/ood_detectors"]
+tests = ["tests", "*/ood_detectors/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
