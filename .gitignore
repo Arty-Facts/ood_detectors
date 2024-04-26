@@ -1,3 +1,9 @@
 .pypirc
 dist/
 __pycache__/
+venv/
+*.pyc
+src/dredze_amazon_reviews.tsv
+src/dredze_amazon_reviews.zip
+src/test.ipynb
+src/emb_amazon_corpus.pkl

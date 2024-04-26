@@ -1,0 +1,24 @@
+--index-url https://download.pytorch.org/whl/cu118
+
+ipykernel
+ipympl
+ipywidgets
+jupyter
+matplotlib
+notebook
+numpy
+optuna
+optuna-dashboard
+torch
+torchvision
+tox
+docker
+cryptography
+pandas
+scikit-learn
+spacy[cuda11x]
+tqdm
+transformers[torch]
+seaborn
+einops
+torchdiffeq 

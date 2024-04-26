@@ -1,0 +1,11 @@
+--index-url https://download.pytorch.org/whl/cu118
+
+matplotlib
+numpy
+torch
+docker
+scikit-learn
+spacy[cuda11x]
+tqdm
+einops
+torchdiffeq 
