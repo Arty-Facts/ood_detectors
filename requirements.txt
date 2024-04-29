@@ -5,7 +5,7 @@ numpy
 torch
 docker
 scikit-learn
-spacy[cuda11x]
+seaborn
 tqdm
 einops
 torchdiffeq 
