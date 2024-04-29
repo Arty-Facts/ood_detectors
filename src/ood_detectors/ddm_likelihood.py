@@ -30,6 +30,13 @@ class DDM_Likelihood():
     def to(self, device):
         self.model.to(device)
         self.device = device
+        return self
+
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
+
+    def state_dict(self):
+        return self.model.state_dict()
 
     def fit(self, dataset, n_epochs, batch_size, num_workers=0):
         self.model.train()
@@ -37,19 +44,19 @@ class DDM_Likelihood():
         loss = functools.partial(losses.score_based_loss, marginal_prob_std=marginal_prob_std_fn)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         result = train.train(dataset, self.model, loss, optimizer, n_epochs, batch_size, self.device, num_workers)
+        return result
+    
+    def __call__(self, *args, **kwargs):
+        return self.predict(*args, **kwargs)
 
-    def predict(self, dataset, batch_size, num_workers=0):
-        if isinstance(dataset, torch.Tensor):
-            if len(dataset.shape) == 1:
-                dataset = dataset.view(-1, self.feat_dim)
-            dataset = torch.utils.data.TensorDataset(dataset)
-
+    def predict(self, dataset, batch_size, num_workers=0, verbose=True):
+        self.model.eval()
         marginal_prob_std_fn = functools.partial(ood_utils.marginal_prob_std, sigma=self.sigma, device=self.device)
         diffusion_coeff_fn = functools.partial(ood_utils.diffusion_coeff, sigma=self.sigma, device=self.device)
         ode_likelihood = functools.partial(ood_utils.ode_likelihood, 
                                         marginal_prob_std=marginal_prob_std_fn,
                                         diffusion_coeff=diffusion_coeff_fn)
         
-        return train.inference(dataset, self.model, ode_likelihood, batch_size, self.device, num_workers=num_workers)
+        return train.inference(dataset, self.model, ode_likelihood, batch_size, self.device, num_workers=num_workers, verbose=verbose)
 
 

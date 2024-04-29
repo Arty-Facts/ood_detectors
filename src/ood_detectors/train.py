@@ -7,7 +7,7 @@ def train(dataset, model, loss_fn, optimizer, n_epochs, batch_size, device, num_
     if verbose:
         print(f'Training for {n_epochs} epochs...')
       
-    data_loader = torch.eval_utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     if verbose:
         epochs = tqdm.trange(n_epochs)
     else:
@@ -47,7 +47,7 @@ def train(dataset, model, loss_fn, optimizer, n_epochs, batch_size, device, num_
 
 
 def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0, verbose=True):
-    data_loader = torch.eval_utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     all_bpds = 0.
     all_items = 0
     score_id = []
@@ -69,37 +69,3 @@ def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0,
 
     return np.concatenate(score_id)
 
-
-def eval(dataset, reference_dataset, ood_datasets, model, ode_likelihood, batch_size, device, num_workers=0, recall=0.95, verbose=True, tw=None):
-    if verbose:
-        print('Running eval. In-distribution data')
-    score_id = inference(dataset, model, ode_likelihood, batch_size, device, num_workers, verbose=verbose)
-    if verbose:
-        print('Running eval. Reference data')
-    score_ref = inference(reference_dataset, model, ode_likelihood, batch_size, device, num_workers, verbose=verbose)
-    ref_auc, _, _ = eval_utils.auc(-score_ref, -score_id)
-    ref_fpr, _ = eval_utils.fpr_recall(-score_ref, -score_id, recall)
-    if verbose:
-        print(f'AUC: {ref_auc:.4f}, FPR: {ref_fpr:.4f}')
-    score_oods = []
-    auc_oods = []
-    fpr_oods = []
-    for i, ood_dataset in enumerate(ood_datasets):
-        if verbose:
-            print(f'Running eval. Out-of-distribution data {i+1}/{len(ood_datasets)}')
-        score_ood = inference(ood_dataset, model, ode_likelihood, batch_size, device, num_workers, verbose=verbose)
-        score_oods.append(score_ood)
-        auc_ood, _, _ = eval_utils.auc(-score_ref, -score_ood)
-        auc_oods.append(auc_ood)
-        fpr_ood, _ = eval_utils.fpr_recall(-score_ref, -score_ood, recall)
-        fpr_oods.append(fpr_ood)
-        if verbose:
-            print(f'AUC: {auc_ood:.4f}, FPR: {fpr_ood:.4f}')
-
-    return {'score': score_id, 
-            'score_ref': score_ref,
-            'ref_auc': ref_auc,
-            'ref_fpr': ref_fpr,
-            'score_oods': score_oods, 
-            'auc': auc_oods, 
-            'fpr': fpr_oods}
