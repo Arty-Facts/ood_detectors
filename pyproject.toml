@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-requirements-txt"]
 build-backend = "hatchling.build"
 
 [project]
 name = "ood_detectors"
-dynamic = ["version"]
+dynamic = ["version", "dependencies"]
 description = ''
 readme = "README.md"
 requires-python = ">=3.8"
@@ -25,7 +25,8 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["requirements.txt"]
 
 [project.urls]
 Documentation = "https://github.com/Arty-Facts/ood_detectors#readme"
