@@ -3,7 +3,7 @@ import torch
 import tqdm
 import ood_detectors.eval_utils as eval_utils
 
-def train(dataset, model, loss_fn, optimizer, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, lrs=True):
+def train(dataset, model, loss_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, lrs=True):
     if verbose:
         print(f'Training for {n_epochs} epochs...')
       
@@ -12,10 +12,10 @@ def train(dataset, model, loss_fn, optimizer, n_epochs, batch_size, device, num_
         epochs = tqdm.trange(n_epochs)
     else:
         epochs = range(n_epochs)
-    if lrs:
-        lr = optimizer.param_groups[0]['lr']
-        lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=len(data_loader), epochs=n_epochs)
-    scaler = torch.cuda.amp.GradScaler()
+    # if lrs:
+    #     lr = optimizer.param_groups[0]['lr']
+    #     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=len(data_loader), epochs=n_epochs)
+    # scaler = torch.cuda.amp.GradScaler()
     avg_epoch_loss = []
     model.train()
     for epoch in epochs:
@@ -24,14 +24,14 @@ def train(dataset, model, loss_fn, optimizer, n_epochs, batch_size, device, num_
         epoch_loss = []
         for x in data_loader:
             x = x.to(device)
-            with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
-                loss = loss_fn(model, x)
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            if lrs:
-                lr_scheduler.step()
+            # with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
+            loss = loss_fn(model, x)
+            # optimizer.zero_grad()
+            # scaler.scale(loss).backward()
+            # scaler.step(optimizer)
+            # scaler.update()
+            # if lrs:
+            #     lr_scheduler.step()
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
             epoch_loss.append(loss.item())
@@ -59,7 +59,7 @@ def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0,
 
     for x in data_iter:
         x = x.to(device)
-        bpd = ode_likelihood(x=x, score_model=model, batch_size=x.shape[0], device=device)
+        bpd = ode_likelihood(model=model, x=x)
         all_bpds += bpd.sum()
         all_items += bpd.shape[0]
         score_id.append(bpd.cpu().numpy())

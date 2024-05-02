@@ -8,3 +8,5 @@ src/dredze_amazon_reviews.zip
 src/test.ipynb
 src/emb_amazon_corpus.pkl
 src/figs/*
+src/features/*
+src/SDE_OOD.ipynb

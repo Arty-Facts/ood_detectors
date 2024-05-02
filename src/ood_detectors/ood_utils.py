@@ -1,116 +1,9 @@
 import torch
 import numpy as np
 from scipy import integrate
-from sklearn import metrics
-import pickle
-import time
-import multiprocessing as mp
-import random
 from torchdiffeq import odeint as odeint_torch
+import ood_detectors.sde as sde_lib
 
-def marginal_prob_std(time_step, sigma, device="cuda"):
-  """Compute the mean and standard deviation of $p_{0t}(x(t) | x(0))$.
-
-  Args:
-    time_step: A vector of time steps.
-    sigma: The $\sigma$ in our SDE.
-
-  Returns:
-    The standard deviation.
-  """
-  if not isinstance(time_step, (torch.Tensor, torch.cuda.FloatTensor)):
-    time_step = torch.tensor(time_step, device=device)
-  return torch.sqrt((sigma**(2 * time_step) - 1.) / 2. / np.log(sigma))
-
-def diffusion_coeff(time_step, sigma, device="cuda"):
-  """Compute the diffusion coefficient of our SDE.
-
-  Args:
-    time_step: A vector of time steps.
-    sigma: The $\sigma$ in our SDE.
-
-  Returns:
-    The vector of diffusion coefficients.
-  """
-  if not isinstance(time_step, (torch.Tensor, torch.cuda.FloatTensor)):
-    time_step = torch.tensor(time_step, device=device)
-  return sigma**time_step
-
-def prior_likelihood(z, sigma):
-  """The likelihood of a Gaussian distribution with mean zero and
-      standard deviation sigma."""
-  shape = z.shape
-  N = np.prod(shape[1:])
-  return -N / 2. * torch.log(2*np.pi*sigma**2) - torch.sum(z**2, dim=1) / (2 * sigma**2)
-
-
-def ode_sampler(score_model,
-                marginal_prob_std,
-                diffusion_coeff,
-                batch_size=64, 
-                device='cuda',
-                z=None,
-                end=1e-3,
-                start=1):
-  """Generate samples from score-based models with black-box ODE solvers.
-
-  Args:
-    score_model: A PyTorch model that represents the time-dependent score-based model.
-    marginal_prob_std: A function that returns the standard deviation 
-      of the perturbation kernel.
-    diffusion_coeff: A function that returns the diffusion coefficient of the SDE.
-    batch_size: The number of samplers to generate by calling this function once.
-    atol: Tolerance of absolute errors.
-    rtol: Tolerance of relative errors.
-    device: 'cuda' for running on GPUs, and 'cpu' for running on CPUs.
-    z: The latent code that governs the final sample. If None, we start from p_1;
-      otherwise, we start from the given z.
-    eps: The smallest time step for numerical stability.
-  """
-  t = torch.ones(batch_size, device=device)
-  # Create the latent code
-  if z is None:
-    init_x = torch.randn(batch_size, 768, device=device) \
-      * marginal_prob_std(t)[:, None]
-  else:
-    init_x = z
-    
-  shape = init_x.shape
-
-#   def score_eval_wrapper(sample, time_steps):
-#     """A wrapper for evaluating the score-based model for the black-box ODE solver."""
-#     sample = sample.reshape(shape)
-#     time_steps = time_steps.reshape((sample.shape[0], ))
-#     with torch.no_grad():
-#         score = score_model(sample, time_steps)
-#     return score
-
-  def score_eval_wrapper(sample, time_steps):
-    """A wrapper of the score-based model for use by the ODE solver."""
-    sample = torch.tensor(sample, device=device, dtype=torch.float32).reshape(shape)
-    time_steps = torch.tensor(time_steps, device=device, dtype=torch.float32).reshape((sample.shape[0], ))    
-    with torch.no_grad():    
-      score = score_model(sample, time_steps)
-    return score.cpu().numpy().reshape((-1,)).astype(np.float64)
-  
-  def ode_func(t, x):        
-    """The ODE function for use by the ODE solver."""
-    time_steps = np.ones((shape[0],)) * t    
-    g = diffusion_coeff(torch.tensor(t)).cpu().numpy()
-    return  -0.5 * (g**2) * score_eval_wrapper(x, time_steps)
-    # time_steps = torch.ones((shape[0],), device=device) * t
-    # g = diffusion_coeff(t)
-    # return -0.5 * (g**2) * score_eval_wrapper(x, time_steps)
-
-  
-#Run the black-box ODE solver.
-  res = integrate.solve_ivp(ode_func, (start, end), init_x.reshape(-1).cpu().numpy(), rtol=1e-5, atol=1e-5, method='RK45')  
-  #print(f"Number of function evaluations: {res.nfev}")
-  x = torch.tensor(res.y[:, -1], device=device).reshape(shape)
-#   timesteps = torch.tensor([start, end], device=device) 
-#   res = odeint_torch(ode_func, init_x, timesteps, rtol=1e-5, atol=1e-5, method='fehlberg2')
-#   x = res[-1].reshape(shape)
-  return x
 
 
 def ode_likelihood(x,
@@ -205,3 +98,158 @@ def ode_likelihood(x,
     N = np.prod(shape[1:])
     bpd = bpd / N + 8.
     return bpd
+
+
+def get_score_fn(sde, model, train=False, continuous=False):
+  """Wraps `score_fn` so that the model output corresponds to a real time-dependent score function.
+
+  Args:
+    sde: An `sde_lib.SDE` object that represents the forward SDE.
+    model: A score model.
+    train: `True` for training and `False` for evaluation.
+    continuous: If `True`, the score-based model is expected to directly take continuous time steps.
+
+  Returns:
+    A score function.
+  """
+
+  if isinstance(sde, sde_lib.VPSDE) or isinstance(sde, sde_lib.subVPSDE):
+    def score_fn(x, t):
+      # Scale neural network output by standard deviation and flip sign
+      if continuous or isinstance(sde, sde_lib.subVPSDE):
+        # For VP-trained models, t=0 corresponds to the lowest noise level
+        # The maximum value of time embedding is assumed to 999 for
+        # continuously-trained models.
+        labels = t * 999
+        score = model(x, labels)
+        std = sde.marginal_prob(torch.zeros_like(x), t)[1]
+      else:
+        # For VP-trained models, t=0 corresponds to the lowest noise level
+        labels = t * (sde.N - 1)
+        score = model(x, labels)
+        std = sde.sqrt_1m_alphas_cumprod.to(labels.device)[labels.long()]
+
+      score = -score / std[:, None]
+      return score
+
+  elif isinstance(sde, sde_lib.VESDE):
+    def score_fn(x, t):
+      if continuous:
+        labels = sde.marginal_prob(torch.zeros_like(x), t)[1]
+      else:
+        # For VE-trained models, t=0 corresponds to the highest noise level
+        labels = sde.T - t
+        labels *= sde.N - 1
+        labels = torch.round(labels).long()
+
+      score = model(x, labels)
+      return score
+
+  else:
+    raise NotImplementedError(f"SDE class {sde.__class__.__name__} not yet supported.")
+
+  return score_fn
+
+def to_flattened_numpy(x):
+    """Flatten a torch tensor `x` and convert it to numpy."""
+    return x.detach().cpu().numpy().reshape((-1,))
+
+
+def from_flattened_numpy(x, shape):
+    """Form a torch tensor with the given `shape` from a flattened numpy array `x`."""
+    return torch.from_numpy(x.reshape(shape))
+
+
+def get_div_fn(fn):
+    """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
+
+    def div_fn(x, t, eps):
+        with torch.enable_grad():
+            x.requires_grad_(True)
+            fn_eps = torch.sum(fn(x, t) * eps)
+            grad_fn_eps = torch.autograd.grad(fn_eps, x)[0]
+        x.requires_grad_(False)
+        return torch.sum(grad_fn_eps * eps, dim=tuple(range(1, len(x.shape))))
+
+    return div_fn
+
+
+def get_likelihood_fn(
+    sde, hutchinson_type="Rademacher", rtol=1e-5, atol=1e-5, method="fehlberg2", eps=1e-5
+):
+    """Create a function to compute the unbiased log-likelihood estimate of a given data point.
+
+    Args:
+      sde: A `sde_lib.SDE` object that represents the forward SDE.
+      inverse_scaler: The inverse data normalizer.
+      hutchinson_type: "Rademacher" or "Gaussian". The type of noise for Hutchinson-Skilling trace estimator.
+      rtol: A `float` number. The relative tolerance level of the black-box ODE solver.
+      atol: A `float` number. The absolute tolerance level of the black-box ODE solver.
+      method: A `str`. The algorithm for the black-box ODE solver.
+        See documentation for `scipy.integrate.solve_ivp`.
+      eps: A `float` number. The probability flow ODE is integrated to `eps` for numerical stability.
+
+    Returns:
+      A function that a batch of data points and returns the log-likelihoods in bits/dim,
+        the latent code, and the number of function evaluations cost by computation.
+    """
+
+    def drift_fn(model, x, t):
+        """The drift function of the reverse-time SDE."""
+        score_fn = get_score_fn(sde, model, continuous=True)
+        # Probability flow ODE is a special case of Reverse SDE
+        rsde = sde.reverse(score_fn, probability_flow=True)
+        return rsde.sde(x, t)[0]
+
+    def div_fn(model, x, t, noise):
+        return get_div_fn(lambda xx, tt: drift_fn(model, xx, tt))(x, t, noise)
+
+    def likelihood_fn(model, x):
+        """Compute an unbiased estimate to the log-likelihood in bits/dim.
+
+        Args:
+          model: A score model.
+          x: A PyTorch tensor.
+
+        Returns:
+          bpd: A PyTorch tensor of shape [batch size]. The log-likelihoods on `data` in bits/dim.
+          z: A PyTorch tensor of the same shape as `data`. The latent representation of `data` under the
+            probability flow ODE.
+          nfe: An integer. The number of function evaluations used for running the black-box ODE solver.
+        """
+        device = x.device
+        with torch.no_grad():
+            shape = x.shape
+            if hutchinson_type == "Gaussian":
+                epsilon = torch.randn_like(x)
+            elif hutchinson_type == "Rademacher":
+                epsilon = torch.randint_like(x, low=0, high=2).float() * 2 - 1.0
+            else:
+                raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
+
+            def ode_func(t, data):
+                sample = data[:shape.numel()].clone().reshape(shape).float()
+
+                vec_t = torch.ones(sample.shape[0], device=sample.device) * t
+                drift = drift_fn(model, sample, vec_t)
+                div = div_fn(model, sample, vec_t, epsilon)
+                return torch.cat([drift.reshape(-1), div], 0)
+            
+            init_state = torch.cat([x.reshape(-1), torch.zeros(shape[0], device=device)], 0)
+            timesteps = torch.tensor([eps, sde.T], device=device)
+
+            # Solving the ODE
+            res = odeint_torch(ode_func, init_state, timesteps, rtol=rtol, atol=atol, method=method)
+            zp = res[-1]
+
+            z = zp[:-shape[0]].reshape(shape)
+            prior_logp = sde.prior_logp(z)
+           
+            delta_logp = zp[-shape[0]:].reshape(shape[0])
+
+            bpd = -(prior_logp + delta_logp) / np.log(2)
+            N = torch.prod(torch.tensor(shape[1:], device=device)).item()
+            bpd = bpd / N + 8  # Convert log-likelihood to bits/dim
+            return bpd
+
+    return likelihood_fn

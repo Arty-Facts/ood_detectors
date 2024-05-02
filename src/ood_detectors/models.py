@@ -110,13 +110,10 @@ class SimpleMLP(nn.Module):
 
     def __init__(
         self,
-        marginal_prob_std,
-        in_channels,
-        time_embed_dim,
-        model_channels,
-        bottleneck_channels,
-        out_channels,
-        num_res_blocks,
+        channels,
+        time_embed_dim=256,
+        bottleneck_channels=1536,
+        num_res_blocks=13,
         dropout=0,
         use_context=False,
         context_channels=512
@@ -124,25 +121,22 @@ class SimpleMLP(nn.Module):
         super().__init__()
 
         self.image_size = 1
-        self.in_channels = in_channels
-        self.model_channels = model_channels
-        self.out_channels = out_channels
+        self.channels = channels
         self.num_res_blocks = num_res_blocks
         self.dropout = dropout
-        self.marginal_prob_std = marginal_prob_std
 
         self.time_embed = nn.Sequential(
-            nn.Linear(model_channels, time_embed_dim),
+            nn.Linear(channels, time_embed_dim),
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
 
-        self.input_proj = nn.Linear(in_channels, model_channels)
+        self.input_proj = nn.Linear(channels, channels)
 
         res_blocks = []
         for i in range(num_res_blocks):
             res_blocks.append(ResBlock(
-                model_channels,
+                channels,
                 bottleneck_channels,
                 time_embed_dim,
                 dropout,
@@ -153,9 +147,9 @@ class SimpleMLP(nn.Module):
         self.res_blocks = nn.ModuleList(res_blocks)
 
         self.out = nn.Sequential(
-            nn.LayerNorm(model_channels, eps=1e-6),
+            nn.LayerNorm(channels, eps=1e-6),
             nn.SiLU(),
-            zero_module(nn.Linear(model_channels, out_channels, bias=True)),
+            zero_module(nn.Linear(channels, channels, bias=True)),
         )
 
     def forward(self, x, timesteps=None, context=None, y=None, **kwargs):
@@ -170,11 +164,10 @@ class SimpleMLP(nn.Module):
         x = x.squeeze()
         #context = context.squeeze()
         x = self.input_proj(x)
-        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
+        t_emb = timestep_embedding(timesteps, self.channels, repeat_only=False)
         emb = self.time_embed(t_emb)
 
         for block in self.res_blocks:
             x = block(x, emb, context)
         x = self.out(x)#.unsqueeze(-1).unsqueeze(-1)
-        x = x / self.marginal_prob_std(timesteps)[:, None]
         return x
