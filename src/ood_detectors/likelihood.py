@@ -42,6 +42,7 @@ class Likelihood:
     def fit(self, dataset, n_epochs, batch_size, 
             num_workers=0,
             loss_fn=None, 
+            verbose=True,
             **kvargs,
             ):
 
@@ -53,7 +54,7 @@ class Likelihood:
                 **kvargs
             )
 
-        return train.train(dataset, self.model, loss_fn, n_epochs, batch_size, self.device, num_workers)
+        return train.train(dataset, self.model, loss_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose)
 
     def predict(self, dataset, batch_size, num_workers=0, verbose=True):
         likelihood_fn = ood_utils.get_likelihood_fn(self.sde)
