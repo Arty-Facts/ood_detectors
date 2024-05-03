@@ -86,9 +86,9 @@ ood_detector = likelihood.Likelihood(
     ).to(device)
 
 update_fn = functools.partial(
-    losses.SDE_EMA_LRS_BF16_GradClip, 
+    losses.SDE_EMA_Warmup_GradClip, 
     ema_rate=ema_rate,
-    total_steps=(len(train_blob['data'])//batch_size) * n_epochs,
+    warmup=warmup,
     grad_clip=grad_clip,
     continuous=continuous,
     reduce_mean=reduce_mean,

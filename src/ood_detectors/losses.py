@@ -190,14 +190,12 @@ class SDE_EMA_Warmup_GradClip:
         return loss
 
 
-class SDE_EMA_LRS_BF16_GradClip:
+class SDE_LRS_BF16:
     def __init__(
         self,
         sde,
         model,
         optimizer,
-        ema_rate=0.999,
-        grad_clip=1,
         total_steps=100000,
         reduce_mean=True,
         continuous=True,
@@ -226,9 +224,6 @@ class SDE_EMA_LRS_BF16_GradClip:
                 )
 
         self.optimizer = optimizer
-        self.ema = ema.ExponentialMovingAverage(model.parameters(), decay=ema_rate)
-        self.step = 0
-        self.grad_clip = grad_clip
         self.lr = optimizer.param_groups[0]["lr"]
         self.scaler = torch.cuda.amp.GradScaler()
         self.total_steps = total_steps
@@ -238,35 +233,19 @@ class SDE_EMA_LRS_BF16_GradClip:
             total_steps=self.total_steps,
         )
 
-    def __call__(self, model, x, train=True):
+    def __call__(self, model, x, *args, **kwargs):
         """Running one step of training or evaluation.
         Returns:
         loss: The average loss value of this state.
         """
 
-        if train:
-            self.optimizer.zero_grad()
-            with torch.cuda.amp.autocast(dtype=torch.bfloat16):
-                loss = self.loss_fn(model, x)
-            self.scaler.scale(loss).backward()
-            if self.grad_clip >= 0:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_norm=self.grad_clip
-                )
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.lrs.step()
-            self.step += 1
-            if self.ema is not None:
-                self.ema.update(model.parameters())
-        else:
-            with torch.no_grad():
-                if self.ema is not None:
-                    self.ema.store(model.parameters())
-                    self.ema.copy_to(model.parameters())
-                with torch.cuda.amp.autocast(dtype=torch.bfloat16):
-                    loss = self.loss_fn(model, x)
-                if self.ema is not None:
-                    self.ema.restore(model.parameters())
+        self.optimizer.zero_grad()
+        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+            loss = self.loss_fn(model, x)
+        self.scaler.scale(loss).backward()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
+        self.lrs.step()
+
+
         return loss
