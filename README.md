@@ -95,7 +95,12 @@ update_fn = functools.partial(
     likelihood_weighting=likelihood_weighting,
     )
 
-train_loss = ood_detector.fit(train_data, update_fn, batch_size)
+train_loss = ood_detector.fit(
+    train_data,  
+    n_epochs=n_epochs,
+    batch_size=batch_size,
+    update_fn=update_fn,
+    )
 ```
 
 ## Create a custom component
