@@ -24,7 +24,7 @@ pip install ood_detectors
 ## Usage
 This package includes several OOD detection algorithms, each tailored to different aspects of OOD detection:
 
-- DDM_Likelihood: A likelihood-based detector that utilizes score-based denoising diffusion models (DDM) to map complex distributions to known ones.
+- Likelihood Based: SubSDE_DDM, VPSDE_DDM and VESDE_DDM are likelihood-based methods that use different variations stochastic differential equations for DDMS to detect OOD samples. 
 
 - Residual: This method employs the least significant eigen vector for OOD detection.
 
@@ -36,10 +36,10 @@ All detectors share a common interface:
 
 ## Example
 ```python
-from ood_detectors import DDM_Likelihood
+import ood_detectors.likelihood as likelihood
 
-ood_detector = DDM_Likelihood()
-ood_detector.fit(train_data, n_epochs, batch_size)
+ood_detector = likelihood.SubSDE_DDM(feat_dim).to('cuda')
+train_loss = ood_detector.fit(train_data, n_epochs, batch_size)
 scores = ood_detector.predict(test_data, batch_size)
 ```
 
@@ -47,9 +47,62 @@ scores = ood_detector.predict(test_data, batch_size)
 from ood_detectors import Residual
 
 ood_detector = Residual()
-ood_detector.fit(train_data)
+train_loss = ood_detector.fit(train_data)
 scores = ood_detector.predict(test_data)
 ```
+
+## low-level interface
+
+The low-level interface allows you to customize the training process and access the model's internal components.
+
+```python
+import ood_detectors.likelihood as likelihood
+import ood_detectors.sde as sde_lib 
+import ood_detectors.models as models
+import ood_detectors.losses as losses
+...
+sde = sde_lib.subVPSDE(beta_min=beta_min, beta_max=beta_max)
+
+model = models.SimpleMLP(
+    channels=feat_dim,
+    bottleneck_channels=bottleneck_channels,
+    num_res_blocks=num_res_blocks,
+    time_embed_dim=time_embed_dim,
+    dropout=dropout,
+)
+
+optimizer = functools.partial(
+                torch.optim.Adam,
+                lr=lr,
+                betas=(beta1, beta2),
+                eps=eps,
+                weight_decay=weight_decay,
+                )
+
+ood_detector = likelihood.Likelihood(
+    sde = sde,
+    model = model,
+    optimizer = optimizer,
+    ).to(device)
+
+update_fn = functools.partial(
+    losses.SDE_EMA_LRS_BF16_GradClip, 
+    ema_rate=ema_rate,
+    total_steps=(len(train_blob['data'])//batch_size) * n_epochs,
+    grad_clip=grad_clip,
+    continuous=continuous,
+    reduce_mean=reduce_mean,
+    likelihood_weighting=likelihood_weighting,
+    )
+
+train_loss = ood_detector.fit(train_data, update_fn, batch_size)
+```
+
+## Create a custom component
+
+You can create a custom component by doing the same thing as the library does. Good luck!
+
+
 ## Evaluate 
 
 To assess the performance of the OOD detectors, you can utilize the following metrics:
@@ -59,15 +112,15 @@ To assess the performance of the OOD detectors, you can utilize the following me
 
 ```python
 import ood_detectors.eval_utils as eval_utils
-score_id = model_residual.predict(train_data)
-score_ref = model_residual.predict(reference_data)
+score_id = ood_detector.predict(train_data)
+score_ref = ood_detector.predict(reference_data)
 print(f"Train AUC: {eval_utils.auc(-score_ref, -score_id):.2%}")
 print(f"Train FPR95: {eval_utils.fpr95(-score_ref, -score_id):.2%}")
 ```
 
 ```python
-results = eval_utils.eval_ood(model, train_data, reference_data, ood_data, batch_size, verbose=False)
-plot_utils.plot(results, id_name, ood_names, encoder=embedding, model=model.__class__.__name__,
+results = eval_utils.eval_ood(ood_detector, train_data, reference_data, ood_data, batch_size, verbose=False)
+plot_utils.plot(results, id_name, ood_names, encoder=embedding, model=ood_detector.name,
                 train_loss=train_loss,
                 config=conf,
                 )

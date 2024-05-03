@@ -5,25 +5,6 @@ import ood_detectors.ood_utils as ood_utils
 import ood_detectors.ema as ema
 
 
-def score_based_loss(model, x, marginal_prob_std, eps=1e-5):
-    """The loss function for training score-based generative models.
-
-    Args:
-      model: A PyTorch model instance that represents a
-        time-dependent score-based model.
-      x: A mini-batch of training data.
-      marginal_prob_std: A function that gives the standard deviation of
-        the perturbation kernel.
-      eps: A tolerance value for numerical stability.
-    """
-    random_t = torch.rand(x.shape[0], device=x.device) * (1.0 - eps) + eps
-    z = torch.randn_like(x)
-    std = marginal_prob_std(random_t)
-    perturbed_x = x + z * std[:, None]
-    score = model(perturbed_x, random_t)
-    loss = torch.mean(torch.sum((score * std[:, None] + z) ** 2, dim=1))
-    return loss
-
 
 def get_sde_loss_fn(
     sde, reduce_mean=True, continuous=True, likelihood_weighting=True, eps=1e-5
@@ -37,8 +18,7 @@ def get_sde_loss_fn(
       continuous: `True` indicates that the model is defined to take continuous time steps. Otherwise it requires
         ad-hoc interpolation to take continuous time steps.
       likelihood_weighting: If `True`, weight the mixture of score matching losses
-        according to https://arxiv.org/abs/2101.09258; otherwise use the weighting recommended in our paper.
-      eps: A `float` number. The smallest time step to sample from.
+        according to https://arxiv.org/abs/2101.09258.
 
     Returns:
       A loss function.
@@ -135,7 +115,7 @@ def get_ddpm_loss_fn(vpsde, reduce_mean=True):
     return loss_fn
 
 
-class SDE_loss:
+class SDE_EMA_Warmup_GradClip:
     def __init__(
         self,
         sde,
@@ -147,20 +127,8 @@ class SDE_loss:
         reduce_mean=True,
         continuous=True,
         likelihood_weighting=False,
-        **kvars,
     ):
-        """Create a one-step training/evaluation function.
-
-        Args:
-            sde: An `sde_lib.SDE` object that represents the forward SDE.
-            optimize_fn: An optimization function.
-            reduce_mean: If `True`, average the loss across data dimensions. Otherwise sum the loss across data dimensions.
-            continuous: `True` indicates that the model is defined to take continuous time steps.
-            likelihood_weighting: If `True`, weight the mixture of score matching losses according to
-            https://arxiv.org/abs/2101.09258; otherwise use the weighting recommended by our paper.
-
-        Returns:
-            A one-step function for training or evaluation.
+        """Create a one-step training/evaluation class.
         """
         if continuous:
             self.loss_fn = get_sde_loss_fn(
@@ -217,6 +185,88 @@ class SDE_loss:
                     self.ema.store(model.parameters())
                     self.ema.copy_to(model.parameters())
                 loss = self.loss_fn(model, x)
+                if self.ema is not None:
+                    self.ema.restore(model.parameters())
+        return loss
+
+
+class SDE_EMA_LRS_BF16_GradClip:
+    def __init__(
+        self,
+        sde,
+        model,
+        optimizer,
+        ema_rate=0.999,
+        grad_clip=1,
+        total_steps=100000,
+        reduce_mean=True,
+        continuous=True,
+        likelihood_weighting=False,
+    ):
+        """Create a one-step training/evaluation class.
+        """
+        if continuous:
+            self.loss_fn = get_sde_loss_fn(
+                sde,
+                reduce_mean=reduce_mean,
+                continuous=True,
+                likelihood_weighting=likelihood_weighting,
+            )
+        else:
+            assert (
+                not likelihood_weighting
+            ), "Likelihood weighting is not supported for original SMLD/DDPM training."
+            if isinstance(sde, sde_lib.VESDE):
+                self.loss_fn = get_smld_loss_fn(sde, reduce_mean=reduce_mean)
+            elif isinstance(sde, sde_lib.VPSDE):
+                self.loss_fn = get_ddpm_loss_fn(sde, reduce_mean=reduce_mean)
+            else:
+                raise ValueError(
+                    f"Discrete training for {sde.__class__.__name__} is not recommended."
+                )
+
+        self.optimizer = optimizer
+        self.ema = ema.ExponentialMovingAverage(model.parameters(), decay=ema_rate)
+        self.step = 0
+        self.grad_clip = grad_clip
+        self.lr = optimizer.param_groups[0]["lr"]
+        self.scaler = torch.cuda.amp.GradScaler()
+        self.total_steps = total_steps
+        self.lrs = torch.optim.lr_scheduler.OneCycleLR(
+            self.optimizer,
+            max_lr=self.lr,
+            total_steps=self.total_steps,
+        )
+
+    def __call__(self, model, x, train=True):
+        """Running one step of training or evaluation.
+        Returns:
+        loss: The average loss value of this state.
+        """
+
+        if train:
+            self.optimizer.zero_grad()
+            with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+                loss = self.loss_fn(model, x)
+            self.scaler.scale(loss).backward()
+            if self.grad_clip >= 0:
+                self.scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), max_norm=self.grad_clip
+                )
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            self.lrs.step()
+            self.step += 1
+            if self.ema is not None:
+                self.ema.update(model.parameters())
+        else:
+            with torch.no_grad():
+                if self.ema is not None:
+                    self.ema.store(model.parameters())
+                    self.ema.copy_to(model.parameters())
+                with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+                    loss = self.loss_fn(model, x)
                 if self.ema is not None:
                     self.ema.restore(model.parameters())
         return loss

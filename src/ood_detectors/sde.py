@@ -4,7 +4,6 @@ import abc
 import torch
 import numpy as np
 
-
 class SDE(abc.ABC):
     """SDE abstract class. Functions are designed for a mini-batch of inputs."""
 

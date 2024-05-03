@@ -11,6 +11,7 @@ def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
                       These may be fractional.
     :param dim: the dimension of the output.
     :param max_period: controls the minimum frequency of the embeddings.
+    :param repeat_only: if True, only repeat the timesteps without embedding.
     :return: an [N x dim] Tensor of positional embeddings.
     """
     if not repeat_only:
@@ -30,11 +31,12 @@ def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
 def zero_module(module):
     """
     Zero out the parameters of a module and return it.
+    :param module: the module to zero out.
+    :return: the zeroed module.
     """
     for p in module.parameters():
         p.detach().zero_()
     return module
-
 
 
 class ResBlock(nn.Module):
@@ -44,6 +46,8 @@ class ResBlock(nn.Module):
     :param mid_channels: the number of middle channels.
     :param emb_channels: the number of timestep embedding channels.
     :param dropout: the rate of dropout.
+    :param use_context: if True, use context conditioning.
+    :param context_channels: the number of context channels.
     """
 
     def __init__(
@@ -83,11 +87,18 @@ class ResBlock(nn.Module):
         self.use_context = use_context
         if use_context:
             self.context_layers = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(context_channels, mid_channels, bias=True),
-        )
+                nn.SiLU(),
+                nn.Linear(context_channels, mid_channels, bias=True),
+            )
 
     def forward(self, x, emb, context):
+        """
+        Forward pass of the residual block.
+        :param x: the input tensor.
+        :param emb: the timestep embedding tensor.
+        :param context: the context tensor.
+        :return: the output tensor.
+        """
         h = self.in_layers(x)
         emb_out = self.emb_layers(emb)
         if self.use_context:
@@ -102,10 +113,13 @@ class ResBlock(nn.Module):
 class SimpleMLP(nn.Module):
     """
     The full skip network with timestep embedding.
-    :param in_channels: channels in the input Tensor.
-    :param model_channels: base channel count for the model.
-    :param out_channels: channels in the output Tensor.
+    :param channels: channels in the input Tensor.
+    :param time_embed_dim: dimension of the timestep embedding.
+    :param bottleneck_channels: base channel count for the model.
     :param num_res_blocks: number of residual blocks per downsample.
+    :param dropout: the rate of dropout.
+    :param use_context: if True, use context conditioning.
+    :param context_channels: the number of context channels.
     """
 
     def __init__(
@@ -157,17 +171,16 @@ class SimpleMLP(nn.Module):
         Apply the model to an input batch.
         :param x: an [N x C x ...] Tensor of inputs.
         :param timesteps: a 1-D batch of timesteps.
-        :param context: conditioning plugged in via crossattn
+        :param context: conditioning plugged in via crossattn.
         :param y: an [N] Tensor of labels, if class-conditional.
         :return: an [N x C x ...] Tensor of outputs.
         """
         x = x.squeeze()
-        #context = context.squeeze()
         x = self.input_proj(x)
         t_emb = timestep_embedding(timesteps, self.channels, repeat_only=False)
         emb = self.time_embed(t_emb)
 
         for block in self.res_blocks:
             x = block(x, emb, context)
-        x = self.out(x)#.unsqueeze(-1).unsqueeze(-1)
+        x = self.out(x)
         return x

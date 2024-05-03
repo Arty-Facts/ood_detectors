@@ -37,8 +37,8 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     for ood_name, score_ood in zip(ood_names, score_oods):
         sns.kdeplot(data=score_ood, bw_adjust=.2, ax=axs[0, 0], label=f'{ood_name}: {np.mean(score_ood):.2f}')
         add_shadow(axs[0, 0], score_ood)
-    axs[0, 0].xaxis.set_major_locator(ticker.MultipleLocator(base=0.5))
-    axs[0, 0].xaxis.set_minor_locator(ticker.MultipleLocator(base=0.1))
+    # axs[0, 0].xaxis.set_major_locator(ticker.MultipleLocator(base=0.5))
+    # axs[0, 0].xaxis.set_minor_locator(ticker.MultipleLocator(base=0.1))
     axs[0, 0].set_title('Density Plots')
     axs[0, 0].set_xlabel('bits/dim')
     axs[0, 0].set_ylabel('Density')

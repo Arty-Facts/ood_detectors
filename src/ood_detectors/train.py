@@ -1,21 +1,34 @@
 import numpy as np
 import torch
 import tqdm
-import ood_detectors.eval_utils as eval_utils
 
-def train(dataset, model, loss_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, lrs=True):
+def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, lrs=True):
+    """
+    Trains a model on a given dataset for a specified number of epochs.
+
+    Args:
+        dataset (torch.utils.data.Dataset): The training dataset.
+        model (torch.nn.Module): The model to be trained.
+        update_fn (callable): The function that updates the model parameters.
+        n_epochs (int): The number of training epochs.
+        batch_size (int): The batch size for training.
+        device (torch.device): The device to run the training on.
+        num_workers (int, optional): The number of workers for data loading. Defaults to 0.
+        verbose (bool, optional): Whether to display training progress. Defaults to True.
+        tw (tensorboardX.SummaryWriter, optional): TensorboardX SummaryWriter for logging. Defaults to None.
+        lrs (bool, optional): Whether to use learning rate scheduling. Defaults to True.
+
+    Returns:
+        list: A list of average epoch losses.
+    """
     if verbose:
         print(f'Training for {n_epochs} epochs...')
       
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
     if verbose:
         epochs = tqdm.trange(n_epochs)
     else:
         epochs = range(n_epochs)
-    # if lrs:
-    #     lr = optimizer.param_groups[0]['lr']
-    #     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=len(data_loader), epochs=n_epochs)
-    # scaler = torch.cuda.amp.GradScaler()
     avg_epoch_loss = []
     model.train()
     for epoch in epochs:
@@ -24,14 +37,7 @@ def train(dataset, model, loss_fn, n_epochs, batch_size, device, num_workers=0, 
         epoch_loss = []
         for x in data_loader:
             x = x.to(device)
-            # with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
-            loss = loss_fn(model, x)
-            # optimizer.zero_grad()
-            # scaler.scale(loss).backward()
-            # scaler.step(optimizer)
-            # scaler.update()
-            # if lrs:
-            #     lr_scheduler.step()
+            loss = update_fn(model, x)
             avg_loss += loss.item() * x.shape[0]
             num_items += x.shape[0]
             epoch_loss.append(loss.item())
@@ -45,8 +51,22 @@ def train(dataset, model, loss_fn, n_epochs, batch_size, device, num_workers=0, 
     return avg_epoch_loss
 
 
-
 def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0, verbose=True):
+    """
+    Performs inference using a trained model on a given dataset.
+
+    Args:
+        dataset (torch.utils.data.Dataset): The dataset for inference.
+        model (torch.nn.Module): The trained model.
+        ode_likelihood (callable): The function that computes the likelihood.
+        batch_size (int): The batch size for inference.
+        device (torch.device): The device to run the inference on.
+        num_workers (int, optional): The number of workers for data loading. Defaults to 0.
+        verbose (bool, optional): Whether to display inference progress. Defaults to True.
+
+    Returns:
+        numpy.ndarray: An array of inference scores.
+    """
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     all_bpds = 0.
     all_items = 0
