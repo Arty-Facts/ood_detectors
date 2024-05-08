@@ -129,7 +129,7 @@ class Likelihood:
 
         """
         likelihood_fn = ood_utils.get_likelihood_fn(self.sde)
-        return train.inference(dataset, self.model, likelihood_fn, batch_size, self.device, num_workers, verbose, collate_fn=collate_fn)
+        return train.inference(dataset, self.model, likelihood_fn, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
     
     def __call__(self, *args, **kwargs):
         """Calls the predict method.
