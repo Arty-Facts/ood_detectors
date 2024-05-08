@@ -51,7 +51,7 @@ class Residual:
             if collate_fn is None:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:
-                data = np.vstack([collate_fn([d])[0].cpu().numpy() for d in data])
+                data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
 
         ec = EmpiricalCovariance(assume_centered=True)
         ec.fit(data - self.u)
@@ -82,7 +82,7 @@ class Residual:
             if collate_fn is None:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:
-                data = np.vstack([collate_fn([d])[0].cpu().numpy() for d in data])
+                data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
 
         return np.linalg.norm((data - self.u) @ self.ns, axis=-1)
 
