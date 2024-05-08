@@ -43,11 +43,14 @@ class Residual:
             list: An empty list.
 
         """
+            
         if isinstance(data, (list, tuple)):
             data = np.array(data)
         elif isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
         elif isinstance(data, torch.utils.data.Dataset):
+            if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
+                collate_fn = data.collate_fn
             if collate_fn is None:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:
@@ -79,6 +82,8 @@ class Residual:
         elif isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
         elif isinstance(data, torch.utils.data.Dataset):
+            if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
+                collate_fn = data.collate_fn
             if collate_fn is None:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:

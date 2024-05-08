@@ -112,6 +112,9 @@ class Likelihood:
             )
         else:
             update_fn = update_fn(sde=self.sde, model=self.model, optimizer=self.optimizer)
+        
+        if collate_fn is None and getattr(dataset, 'collate_fn', None) is not None:
+            collate_fn = dataset.collate_fn
 
         return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
 
@@ -129,6 +132,8 @@ class Likelihood:
 
         """
         likelihood_fn = ood_utils.get_likelihood_fn(self.sde)
+        if collate_fn is None and getattr(dataset, 'collate_fn', None) is not None:
+            collate_fn = dataset.collate_fn
         return train.inference(dataset, self.model, likelihood_fn, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
     
     def __call__(self, *args, **kwargs):
