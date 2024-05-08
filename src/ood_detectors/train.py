@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import tqdm
 
-def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, lrs=True):
+def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, collate_fn=None):
     """
     Trains a model on a given dataset for a specified number of epochs.
 
@@ -23,8 +23,10 @@ def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0
     """
     if verbose:
         print(f'Training for {n_epochs} epochs...')
-      
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+    if collate_fn is None:
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+    else:
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True, collate_fn=collate_fn)
     if verbose:
         epochs = tqdm.trange(n_epochs)
     else:
@@ -51,7 +53,7 @@ def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0
     return avg_epoch_loss
 
 
-def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0, verbose=True):
+def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0, verbose=True, collate_fn=None):
     """
     Performs inference using a trained model on a given dataset.
 
@@ -67,7 +69,10 @@ def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0,
     Returns:
         numpy.ndarray: An array of inference scores.
     """
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    if collate_fn is None:
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    else:
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=collate_fn)
     all_bpds = 0.
     all_items = 0
     score_id = []

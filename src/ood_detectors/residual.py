@@ -30,7 +30,7 @@ class Residual:
         self.u = u
         self.name = "Residual"
 
-    def fit(self, data, *args, **kwargs):
+    def fit(self, data, *args, collate_fn=None, **kwargs):
         """
         Fit the Residual model to the given data.
 
@@ -47,8 +47,11 @@ class Residual:
             data = np.array(data)
         elif isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
-        elif isinstance(data, torch.utils.data.DataLoader):
-            data = np.vstack([x.cpu().numpy() for x, _ in data])
+        elif isinstance(data, torch.utils.data.Dataset):
+            if collate_fn is None:
+                data = np.vstack([x.cpu().numpy() for x, *_ in data])
+            else:
+                data = np.vstack([collate_fn([d])[0].cpu().numpy() for d in data])
 
         ec = EmpiricalCovariance(assume_centered=True)
         ec.fit(data - self.u)
@@ -58,7 +61,7 @@ class Residual:
         )
         return []
 
-    def predict(self, data, *args, **kwargs):
+    def predict(self, data, *args, collate_fn=None, **kwargs):
         """
         Predict the outlier scores for the given data.
 
@@ -75,8 +78,11 @@ class Residual:
             data = np.array(data)
         elif isinstance(data, torch.Tensor):
             data = data.cpu().numpy()
-        elif isinstance(data, torch.utils.data.DataLoader):
-            data = np.vstack([x.cpu().numpy() for x, _ in data])
+        elif isinstance(data, torch.utils.data.Dataset):
+            if collate_fn is None:
+                data = np.vstack([x.cpu().numpy() for x, *_ in data])
+            else:
+                data = np.vstack([collate_fn([d])[0].cpu().numpy() for d in data])
 
         return np.linalg.norm((data - self.u) @ self.ns, axis=-1)
 

@@ -88,6 +88,7 @@ class Likelihood:
             num_workers=0,
             update_fn=None, 
             verbose=True,
+            collate_fn=None,
             ):
         """Trains the model on the given dataset.
 
@@ -112,9 +113,9 @@ class Likelihood:
         else:
             update_fn = update_fn(sde=self.sde, model=self.model, optimizer=self.optimizer)
 
-        return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose)
+        return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
 
-    def predict(self, dataset, batch_size, num_workers=0, verbose=True):
+    def predict(self, dataset, batch_size, num_workers=0, verbose=True, collate_fn=None):
         """Performs inference on the given dataset.
 
         Args:
@@ -128,7 +129,7 @@ class Likelihood:
 
         """
         likelihood_fn = ood_utils.get_likelihood_fn(self.sde)
-        return train.inference(dataset, self.model, likelihood_fn, batch_size, self.device, num_workers, verbose)
+        return train.inference(dataset, self.model, likelihood_fn, batch_size, self.device, num_workers, verbose, collate_fn=collate_fn)
     
     def __call__(self, *args, **kwargs):
         """Calls the predict method.
