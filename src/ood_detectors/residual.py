@@ -55,6 +55,9 @@ class Residual:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:
                 data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
+        feat_dim = data.shape[-1]
+        if self.dims < 1:
+            self.dims = int(feat_dim * self.dims)
 
         ec = EmpiricalCovariance(assume_centered=True)
         ec.fit(data - self.u)
