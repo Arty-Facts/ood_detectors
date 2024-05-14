@@ -1,8 +1,5 @@
---index-url https://download.pytorch.org/whl/cu118
+--extra-index-url https://download.pytorch.org/whl/cu118
 
-ipykernel
-ipympl
-ipywidgets
 jupyter
 matplotlib
 notebook

@@ -1,6 +1,10 @@
 import time, random
 import multiprocessing as mp
 
+try:
+    mp.set_start_method('spawn')
+except RuntimeError:
+    pass
 class dummy:
     @staticmethod
     def is_alive():
@@ -26,7 +30,7 @@ class Worker:
         self.start_time = time.perf_counter()
 
 
-def parallelize(func, jobs, gpu_nodes, verbose=True, timeout=3600):
+def parallelize(func, jobs, gpu_nodes, verbose=True, timeout=60*60*24):
     """
     Parallelize the execution of a function on multiple GPUs.
 

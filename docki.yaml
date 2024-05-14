@@ -38,7 +38,7 @@
 # notebook_password: docki
 #     
 
-base_image: ubuntu:latest
+base_image: nvidia/cuda:11.8.0-devel-ubuntu22.04
 shm_size: 16G # shared memory size
 tag: ood_detectors_image
 system_dep:
