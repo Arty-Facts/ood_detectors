@@ -40,9 +40,12 @@ def select_trial(trial,method):
         if method != 'subVPSDE':
             conf['continuous'] = trial.suggest_categorical('continuous', [True, False])
         else:
-            conf['continuous'] = False
+            conf['continuous'] = True
+        if conf['continuous']:
+            conf['likelihood_weighting'] = trial.suggest_categorical('likelihood_weighting', [True, False])
+        else:
+            conf['likelihood_weighting'] = False
         conf['reduce_mean'] = trial.suggest_categorical('reduce_mean', [True, False])
-        conf['likelihood_weighting'] = trial.suggest_categorical('likelihood_weighting', [True, False])
         if method == 'VESDE':
             conf['sigma_min'] = trial.suggest_float('VESDE.sigma_min', 0.01, 0.1)
             conf['sigma_max'] = trial.suggest_float('VESDE.sigma_max', 10.0, 60.0)
@@ -56,7 +59,7 @@ def select_trial(trial,method):
             raise ValueError(f'Unknown method: {method}')
     return conf
 
-def run(conf, data, encoder, dataset, method, device):
+def run(conf, data, encoder, dataset, method, device, reduce_data=-1):
     train_data_path = data[encoder][dataset]["id"]["train"]
     batch_size = conf.get('batch_size', 1024)
     with open(train_data_path, 'rb') as f:
@@ -150,7 +153,11 @@ def run(conf, data, encoder, dataset, method, device):
         for type_name, data in datasets.items():
             with open(data, 'rb') as f:
                 ood_data = pickle.load(f)
-            score_ood = ood_model.predict(ood_data['features'], batch_size, verbose=False)
+                data = ood_data['features']
+            if reduce_data > 0:
+                prem = torch.randperm(data.shape[0])
+                data = data[prem[:reduce_data]]
+            score_ood = ood_model.predict(data, batch_size, verbose=False)
             ood_auc = eval_utils.auc(-score_ref, -score_ood)
             results[name][type_name] = ood_auc
     return results
@@ -162,10 +169,12 @@ def objective(trial, data, encoders, datasets, method, device, verbose=True):
     nearoods = []
     if verbose:
         bar = tqdm.tqdm(total=len(encoders)*len(datasets))
+    random.shuffle(encoders)
     for encoder in encoders:
+        random.shuffle(datasets)
         for dataset in datasets:
             if verbose:
-                bar.set_description(f'Encoder: {encoder}, Dataset: {dataset}')
+                bar.set_description(f'Method: {method},Encoder: {encoder}, Dataset: {dataset}')
             results = run(conf, data, encoder, dataset, method, device)
             id = results['id']
             farood = sum(results['farood'].values()) / len(results['farood'])
@@ -191,8 +200,8 @@ def ask_tell_optuna(objective_func, data, encoders, datasets, method, device):
         
 
 def main():
-    features = pathlib.Path(r"H:\arty\data\features_open_ood")
-    # features = pathlib.Path("/mnt/data/arty/data/features_open_ood")
+    # features = pathlib.Path(r"H:\arty\data\features_open_ood")
+    features = pathlib.Path("/mnt/data/arty/data/features_open_ood")
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
@@ -215,7 +224,7 @@ def main():
         jobs.append((objective, features_data, encoders, datasets, m))
        
     trials = 100
-    gpu_nodes = [0]
+    gpu_nodes = [0, 1, 2, 3] * 2
     random.shuffle(jobs)
     print(f'Running {len(jobs)} jobs...')
     ops_utils.parallelize(ask_tell_optuna, jobs*trials, gpu_nodes, verbose=True, timeout=60*60*24)
