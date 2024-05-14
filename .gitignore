@@ -10,3 +10,5 @@ src/emb_amazon_corpus.pkl
 src/figs/*
 src/features/*
 src/SDE_OOD.ipynb
+src/checkpoints/*
+src/checkpoints/*
