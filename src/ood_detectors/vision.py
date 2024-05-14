@@ -466,11 +466,10 @@ data_list_open_ood = [
 AVAILABLE_ENCODERS = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
 
 def download_and_extract(hash, checkpoint_path):
-
-    gdown.download(id=hash, output=str(checkpoint_path / "tmp.zip") )
-    with zipfile.ZipFile(checkpoint_path/"tmp.zip", 'r') as zip_ref:
+    gdown.download(id=hash, output=str(checkpoint_path / f"{hash}.zip") )
+    with zipfile.ZipFile(checkpoint_path/f"{hash}.zip", 'r') as zip_ref:
         zip_ref.extractall(checkpoint_path)
-    (checkpoint_path/"tmp.zip").unlink()
+    (checkpoint_path/f"{hash}.zip").unlink()
 
 
 def get_encoder(name):
