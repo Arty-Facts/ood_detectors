@@ -13,6 +13,7 @@ import ood_detectors.ops_utils as ops_utils
 import multiprocessing as mp
 import pickle
 import random
+import tqdm
 # data = {
 #         'features': features_vectors,
 #         'encoder': encoder_name,
@@ -154,13 +155,17 @@ def run(conf, data, encoder, dataset, method, device):
             results[name][type_name] = ood_auc
     return results
 
-def objective(trial, data, encoders, datasets, method, device):
+def objective(trial, data, encoders, datasets, method, device, verbose=True):
     conf = select_trial(trial, method)
     ids = []
     faroods = []
     nearoods = []
+    if verbose:
+        bar = tqdm.tqdm(total=len(encoders)*len(datasets))
     for encoder in encoders:
         for dataset in datasets:
+            if verbose:
+                bar.set_description(f'Encoder: {encoder}, Dataset: {dataset}')
             results = run(conf, data, encoder, dataset, method, device)
             id = results['id']
             farood = sum(results['farood'].values()) / len(results['farood'])
@@ -168,6 +173,9 @@ def objective(trial, data, encoders, datasets, method, device):
             ids.append(id)
             faroods.append(farood)
             nearoods.append(nearood)
+            if verbose:
+                bar.set_postfix(id=id, farood=farood, nearood=nearood)
+                bar.update()
     id = sum(ids) / len(ids)
     farood = sum(faroods) / len(faroods)
     nearood = sum(nearoods) / len(nearoods)
