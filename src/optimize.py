@@ -27,16 +27,16 @@ def select_trial(trial,method):
     if method == 'Residual':
         conf['dims'] = trial.suggest_float('Residual.dims', 0, 1)
     else:
-        conf['n_epochs'] = trial.suggest_int('n_epochs', 100, 1000, step=100)
+        conf['n_epochs'] = trial.suggest_int('n_epochs', 100, 500, step=100)
         conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 256, 2048, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 3, 15)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
         conf['dropout'] = trial.suggest_float('dropout', 0.0, 0.5)
         conf['lr'] = trial.suggest_float('lr', 1e-6, 1e-2, log=True)
-        conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
-        conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
-        conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
-        conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
+        # conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
+        # conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
+        # conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
+        # conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
         if method != 'subVPSDE':
             conf['continuous'] = trial.suggest_categorical('continuous', [True, False])
         else:
@@ -47,42 +47,46 @@ def select_trial(trial,method):
             conf['likelihood_weighting'] = False
         conf['reduce_mean'] = trial.suggest_categorical('reduce_mean', [True, False])
         if method == 'VESDE':
-            conf['sigma_min'] = trial.suggest_float('VESDE.sigma_min', 0.01, 0.1)
-            conf['sigma_max'] = trial.suggest_float('VESDE.sigma_max', 10.0, 60.0)
+            conf['sigma_min'] = trial.suggest_float('sigma_min', 0.01, 0.1)
+            conf['sigma_max'] = trial.suggest_float('sigma_max', 10.0, 60.0)
         elif method == 'VPSDE':
-            conf['beta_min'] = trial.suggest_float('VPSDE.beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('VPSDE.beta_max', 10.0, 30.0)
+            conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
+            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
         elif method == 'subVPSDE':
-            conf['beta_min'] = trial.suggest_float('subVPSDE.beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('subVPSDE.beta_max', 10.0, 30.0)
+            conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
+            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
         else:
             raise ValueError(f'Unknown method: {method}')
     return conf
 
-def run(conf, data, encoder, dataset, method, device, reduce_data=-1):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=1024, reduce_data_train=1024*10):
     train_data_path = data[encoder][dataset]["id"]["train"]
-    batch_size = conf.get('batch_size', 1024)
     with open(train_data_path, 'rb') as f:
         train_blob = pickle.load(f)
+    data_train = train_blob['features']
+    if reduce_data_train > 0:
+        prem = torch.randperm(data_train.shape[0])
+        data_train = data_train[prem[:reduce_data_train]]
+    batch_size = conf.get('batch_size', 1024)
 
     if method == 'Residual':
         dims = conf['dims']
         ood_model = Residual(dims=dims)
-        ood_model.fit(train_blob['features'])
+        ood_model.fit(data_train)
     else:
 
         # Hyperparameters
-        feat_dim = train_blob['features'].shape[-1]
-        n_epochs = conf['n_epochs']
+        feat_dim = data_train.shape[-1]
+        n_epochs = conf.get('n_epochs', 200)
         bottleneck_channels = conf['bottleneck_channels']
         num_res_blocks = conf['num_res_blocks']
         time_embed_dim = conf['time_embed_dim']
         dropout = conf['dropout']
         lr = conf['lr']
-        beta1 = conf['beta1']
-        beta2 = conf['beta2']
-        eps = conf['eps']
-        weight_decay = conf['weight_decay']
+        beta1 = conf.get('beta1', 0.9)
+        beta2 = conf.get('beta2', 0.999)
+        eps = conf.get('eps', 1e-8)
+        weight_decay = conf.get('weight_decay', 0.0)
         continuous = conf['continuous']
         reduce_mean = conf['reduce_mean']
         likelihood_weighting = conf['likelihood_weighting']
@@ -128,20 +132,24 @@ def run(conf, data, encoder, dataset, method, device, reduce_data=-1):
             reduce_mean=reduce_mean,
             likelihood_weighting=likelihood_weighting,
             )
-        
+
         loss = ood_model.fit(
-            train_blob['features'],
+            data_train,
             n_epochs=n_epochs,
             batch_size=batch_size,
             update_fn=update_fn,
             verbose=False,
         )
 
-    score_id = ood_model.predict(train_blob['features'], batch_size, verbose=False)
+    score_id = ood_model.predict(data_train, batch_size, verbose=False)
     test_data_path = data[encoder][dataset]["id"]["test"]
     with open(test_data_path, 'rb') as f:
         test_blob = pickle.load(f)
-    score_ref = ood_model.predict(test_blob['features'], batch_size, verbose=False)
+    data_test = test_blob['features']
+    if reduce_data_eval > 0:
+        prem = torch.randperm(data_test.shape[0])
+        data_test = data_test[prem[:reduce_data_eval]]
+    score_ref = ood_model.predict(data_test, batch_size, verbose=False)
     results = {}
     id_auc = eval_utils.auc(-score_ref, -score_id)
     results['id'] = id_auc
@@ -152,12 +160,12 @@ def run(conf, data, encoder, dataset, method, device, reduce_data=-1):
             results[name] = {}
         for type_name, data in datasets.items():
             with open(data, 'rb') as f:
-                ood_data = pickle.load(f)
-                data = ood_data['features']
-            if reduce_data > 0:
-                prem = torch.randperm(data.shape[0])
-                data = data[prem[:reduce_data]]
-            score_ood = ood_model.predict(data, batch_size, verbose=False)
+                ood_data_blob = pickle.load(f)
+            data_ood = ood_data_blob['features']
+            if reduce_data_eval > 0:
+                prem = torch.randperm(data_ood.shape[0])
+                data_ood = data_ood[prem[:reduce_data_eval]]
+            score_ood = ood_model.predict(data_ood, batch_size, verbose=False)
             ood_auc = eval_utils.auc(-score_ref, -score_ood)
             results[name][type_name] = ood_auc
     return results
@@ -217,7 +225,7 @@ def main():
     encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
     #['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    datasets = ['imagenet200', 'cifar10', 'cifar100']
+    datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100']
     methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
     jobs = []
     for m in methods:

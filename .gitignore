@@ -13,3 +13,4 @@ src/SDE_OOD.ipynb
 src/checkpoints/*
 src/checkpoints/*
 src/optuna.db
+src/.nfs*
