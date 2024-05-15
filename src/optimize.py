@@ -18,16 +18,16 @@ def select_trial(trial,method):
     if method == 'Residual':
         conf['dims'] = trial.suggest_float('Residual.dims', 0, 1)
     else:
-        conf['n_epochs'] = trial.suggest_int('n_epochs', 100, 1000, step=100)
+        conf['n_epochs'] = trial.suggest_int('n_epochs', 100, 500, step=100)
         conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 256, 2048, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 3, 15)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
         conf['dropout'] = trial.suggest_float('dropout', 0.0, 0.5)
         conf['lr'] = trial.suggest_float('lr', 1e-6, 1e-2, log=True)
-        conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
-        conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
-        conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
-        conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
+        # conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
+        # conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
+        # conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
+        # conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
         if method != 'subVPSDE':
             conf['continuous'] = trial.suggest_categorical('continuous', [True, False])
         else:
@@ -38,18 +38,17 @@ def select_trial(trial,method):
             conf['likelihood_weighting'] = False
         conf['reduce_mean'] = trial.suggest_categorical('reduce_mean', [True, False])
         if method == 'VESDE':
-            conf['sigma_min'] = trial.suggest_float('VESDE.sigma_min', 0.01, 0.1)
-            conf['sigma_max'] = trial.suggest_float('VESDE.sigma_max', 10.0, 60.0)
+            conf['sigma_min'] = trial.suggest_float('sigma_min', 0.01, 0.1)
+            conf['sigma_max'] = trial.suggest_float('sigma_max', 10.0, 60.0)
         elif method == 'VPSDE':
-            conf['beta_min'] = trial.suggest_float('VPSDE.beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('VPSDE.beta_max', 10.0, 30.0)
+            conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
+            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
         elif method == 'subVPSDE':
-            conf['beta_min'] = trial.suggest_float('subVPSDE.beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('subVPSDE.beta_max', 10.0, 30.0)
+            conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
+            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
         else:
             raise ValueError(f'Unknown method: {method}')
     return conf
-
 
 
 def objective(trial, data, encoders, datasets, method, device, verbose=True):

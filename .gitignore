@@ -15,3 +15,4 @@ src/checkpoints/*
 src/optuna.db
 src/results.yaml
 src/res.yaml
+src/.nfs*
