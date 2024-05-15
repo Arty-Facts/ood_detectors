@@ -147,7 +147,7 @@ if __name__ == "__main__":
         else:
             tmp[parts[-2]] = path
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    datasets = ['imagenet200']
+    datasets = ['imagenet200', 'cifar10']
     # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
     encoders = ['dinov2', 'vit', 'clip']
     open_ood_encoders = ['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             },
         'VESDE':
             {
-                'n_epochs': 200,
+                'n_epochs': 100,
                 'bottleneck_channels': 1536,
                 'num_res_blocks': 12,
                 'time_embed_dim': 256,
@@ -181,7 +181,7 @@ if __name__ == "__main__":
             },
         'VPSDE':
             {
-                'n_epochs': 200,
+                'n_epochs': 100,
                 'bottleneck_channels': 1536,
                 'num_res_blocks': 12,
                 'time_embed_dim': 256,
@@ -199,7 +199,7 @@ if __name__ == "__main__":
             },
         'subVPSDE':
             {
-                'n_epochs': 200,
+                'n_epochs': 100,
                 'bottleneck_channels': 1536,
                 'num_res_blocks': 12,
                 'time_embed_dim': 256,
@@ -240,6 +240,9 @@ if __name__ == "__main__":
             "metrics": {
                 "AUC": float(res['id']['AUC']),
                 "FPR_95": float(res['id']['FPR_95']),
+                "score_id": float(res['id']['score_id']),
+                "score_ref": float(res['id']['score_ref']),
+                "loss": float(res['id']['loss']),
             },
         }
         means = {}  
@@ -254,17 +257,21 @@ if __name__ == "__main__":
                     "metrics": {
                         "AUC": float(res['AUC']),
                         "FPR_95": float(res['FPR_95']),
+                        "score": float(res['score_ood']),
                     },
                 })
                 if type_name not in means:
-                    means[type_name] = []
-                if "AUC" in means[type_name]:
+                    means[type_name] = {}
+                if "AUC" not in means[type_name]:
                     means[type_name]["AUC"] = []
-                if "FPR_95" in means[type_name]:
+                if "FPR_95" not in means[type_name]:
                     means[type_name]["FPR_95"] = []
+                if "score" not in means[type_name]:
+                    means[type_name]["score"] = []
                 
                 means[type_name]["AUC"].append(float(res['AUC']))
                 means[type_name]["FPR_95"].append(float(res['FPR_95']))
+                means[type_name]["score"].append(float(res['score_ood']))
         means = {k: {m: sum(v) / len(v) for m, v in metrics.items()} for k, metrics in means.items()}
         results[method][encoder][dataset]["means"] = means
 
