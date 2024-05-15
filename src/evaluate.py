@@ -24,21 +24,21 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     if method == 'Residual':
         dims = conf['dims']
         ood_model = Residual(dims=dims)
-        ood_model.fit(data_train)
+        loss = ood_model.fit(data_train)
     else:
 
         # Hyperparameters
         feat_dim = data_train.shape[-1]
-        n_epochs = conf['n_epochs']
+        n_epochs = conf.get('n_epochs', 200)
         bottleneck_channels = conf['bottleneck_channels']
         num_res_blocks = conf['num_res_blocks']
         time_embed_dim = conf['time_embed_dim']
         dropout = conf['dropout']
         lr = conf['lr']
-        beta1 = conf['beta1']
-        beta2 = conf['beta2']
-        eps = conf['eps']
-        weight_decay = conf['weight_decay']
+        beta1 = conf.get('beta1', 0.9)
+        beta2 = conf.get('beta2', 0.999)
+        eps = conf.get('eps', 1e-8)
+        weight_decay = conf.get('weight_decay', 0)
         continuous = conf['continuous']
         reduce_mean = conf['reduce_mean']
         likelihood_weighting = conf['likelihood_weighting']
@@ -106,7 +106,11 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     results = {}
     id_auc = eval_utils.auc(-score_ref, -score_id)
     id_fpr_95 = eval_utils.fpr(-score_ref, -score_id, 0.95)
-    results['id'] = {'AUC': id_auc, 'FPR_95': id_fpr_95}
+    results['id'] = {'AUC': id_auc, 
+                     'FPR_95': id_fpr_95, 
+                     'score_id': score_id.mean().item(),
+                     'score_ref': score_ref.mean().item(), 
+                     'loss': loss[-1]}
     for name, datasets in data[encoder][dataset].items():
         if name == 'id':
             continue
@@ -122,7 +126,10 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             score_ood = ood_model.predict(data, batch_size, verbose=verbose)
             ood_auc = eval_utils.auc(-score_ref, -score_ood)
             ood_fpr_95 = eval_utils.fpr(-score_ref, -score_ood, 0.95)
-            results[name][type_name] = {'AUC': ood_auc, 'FPR_95': ood_fpr_95}
+            results[name][type_name] = {'AUC': ood_auc, 
+                                        'FPR_95': ood_fpr_95,
+                                        'score_ood': score_ood.mean().item(),
+                                        }
     return results
 
 if __name__ == "__main__":

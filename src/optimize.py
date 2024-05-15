@@ -39,13 +39,13 @@ def select_trial(trial,method):
         conf['reduce_mean'] = trial.suggest_categorical('reduce_mean', [True, False])
         if method == 'VESDE':
             conf['sigma_min'] = trial.suggest_float('sigma_min', 0.01, 0.1)
-            conf['sigma_max'] = trial.suggest_float('sigma_max', 10.0, 60.0)
+            conf['sigma_max'] = trial.suggest_int('beta_max', 10, 60, step=5)
         elif method == 'VPSDE':
             conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
+            conf['beta_max'] = trial.suggest_int('beta_max', 10, 30, step=5)
         elif method == 'subVPSDE':
             conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_float('beta_max', 10.0, 30.0)
+            conf['beta_max'] = trial.suggest_int('beta_max', 10, 30, step=5)
         else:
             raise ValueError(f'Unknown method: {method}')
     return conf
@@ -63,16 +63,32 @@ def objective(trial, data, encoders, datasets, method, device, verbose=True):
         random.shuffle(datasets)
         for dataset in datasets:
             if verbose:
-                bar.set_description(f'Method: {method},Encoder: {encoder}, Dataset: {dataset}')
+                bar.set_description(f'Method: {method}, Encoder: {encoder}, Dataset: {dataset}')
             results = run(conf, data, encoder, dataset, method, device)
-            id = results['id']
+            auc = results['id']["AUC"]
+            fpr = results['id']["FPR_95"]
+            loss = results['id']['loss']
+            score_id = results['id']['score_id']
+            score_ref = results['id']['score_ref']
             farood = sum([v["AUC"] for v in results['farood'].values()]) / len(results['farood'])
             nearood = sum([v["AUC"] for v in results['nearood'].values()]) / len(results['nearood'])
-            ids.append(id)
+            ids.append(auc)
             faroods.append(farood)
             nearoods.append(nearood)
+            trial.set_user_attr(f'{encoder}_{dataset}_id_AUC', float(auc))
+            trial.set_user_attr(f'{encoder}_{dataset}_id_FPR95', float(fpr))
+            trial.set_user_attr(f'{encoder}_{dataset}_id_loss', float(loss))
+            trial.set_user_attr(f'{encoder}_{dataset}_score_id', float(score_id))
+            trial.set_user_attr(f'{encoder}_{dataset}_score_ref', float(score_ref))
+            for d_name, v in results['farood'].items():
+                for m, value in v.items():
+                    trial.set_user_attr(f'{encoder}_{dataset}_farood_{d_name}_{m}', float(value))
+            for d_name, v in results['nearood'].items():
+                for m, value in v.items():
+                    trial.set_user_attr(f'{encoder}_{dataset}_nearood_{d_name}_{m}', float(value))
+                
             if verbose:
-                bar.set_postfix(id=id, farood=farood, nearood=nearood)
+                bar.set_postfix(id=auc, farood=farood, nearood=nearood)
                 bar.update()
     id = sum(ids) / len(ids)
     farood = sum(faroods) / len(faroods)
@@ -108,7 +124,7 @@ def main():
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
     # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
-    methods = ['subVPSDE', 'Residual']
+    methods = ['subVPSDE']
     jobs = []
     for m in methods:
         jobs.append((objective, features_data, encoders, datasets, m))

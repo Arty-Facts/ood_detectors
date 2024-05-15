@@ -66,7 +66,7 @@ class Residual:
         self.ns = np.ascontiguousarray(
             (eigen_vectors.T[np.argsort(eig_vals * -1)[self.dims :]]).T
         )
-        return []
+        return [-1]
 
     def predict(self, data, *args, collate_fn=None, **kwargs):
         """

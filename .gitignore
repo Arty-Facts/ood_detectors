@@ -16,3 +16,4 @@ src/optuna.db
 src/results.yaml
 src/res.yaml
 src/.nfs*
+src/optuna_v2.db
