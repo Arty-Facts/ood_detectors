@@ -65,7 +65,7 @@ class Residual:
         eig_vals, eigen_vectors = np.linalg.eig(ec.covariance_)
         self.ns = np.ascontiguousarray(
             (eigen_vectors.T[np.argsort(eig_vals * -1)[self.dims :]]).T
-        )
+        ).astype(np.float32)
         return [-1]
 
     def predict(self, data, *args, collate_fn=None, **kwargs):
@@ -92,7 +92,7 @@ class Residual:
                 data = np.vstack([x.cpu().numpy() for x, *_ in data])
             else:
                 data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
-
+        data = data.astype(np.float32)
         return np.linalg.norm((data - self.u) @ self.ns, axis=-1)
 
     def __call__(self, *args, **kwargs):
