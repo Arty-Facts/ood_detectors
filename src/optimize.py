@@ -124,7 +124,7 @@ def main():
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
     # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
-    methods = ['subVPSDE']
+    methods = ['VESDE', 'VPSDE',]
     jobs = []
     for m in methods:
         jobs.append((objective, features_data, encoders, datasets, m))
