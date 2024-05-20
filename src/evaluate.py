@@ -135,7 +135,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
     checkpoint_path = pathlib.Path(checkpoints)
     checkpoint_path.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = checkpoint_path / f"{method}_{dataset}_{encoder}_{mean_auc}.pt"
+    checkpoint_path = checkpoint_path / f"{method}_{encoder}_{dataset}_{mean_auc}.pt"
     torch.save({
         "config": conf,
         "model": ood_model.state_dict(),
