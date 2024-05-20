@@ -11,7 +11,7 @@ import pathlib
 import tqdm
 import yaml
 
-def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoints="checkpoints"):
     train_data_path = data[encoder][dataset]["id"]["train"]
     batch_size = conf.get('batch_size', 1024)
     with open(train_data_path, 'rb') as f:
@@ -111,6 +111,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
                      'score_id': score_id.mean().item(),
                      'score_ref': score_ref.mean().item(), 
                      'loss': loss[-1]}
+    ood_auc_mean = []
     for name, datasets in data[encoder][dataset].items():
         if name == 'id':
             continue
@@ -130,6 +131,19 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
                                         'FPR_95': ood_fpr_95,
                                         'score_ood': score_ood.mean().item(),
                                         }
+            ood_auc_mean.append(ood_auc)
+    mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
+    checkpoint_path = pathlib.Path(checkpoints)
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = checkpoint_path / f"{method}_{dataset}_{encoder}_{mean_auc}.pt"
+    torch.save({
+        "config": conf,
+        "model": ood_model.state_dict(),
+        "results": results,
+        "method": method,
+        "encoder": encoder,
+        "dataset": dataset,
+    }, checkpoint_path)
     return results
 
 if __name__ == "__main__":
@@ -147,13 +161,13 @@ if __name__ == "__main__":
         else:
             tmp[parts[-2]] = path
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    datasets = ['imagenet200']
-    # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
-    encoders = ['dinov2', 'vit', 'clip']
+    datasets = ['imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
+    # encoders = ['dinov2', 'vit', 'clip']
     open_ood_encoders = ['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     open_ood_datasets = ['cifar10', 'cifar100', 'imagenet200', 'imagenet']
-    # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
-    methods = ['subVPSDE', 'Residual']
+    methods = ['subVPSDE', 'VESDE', 'VPSDE', 'Residual']
+    # methods = ['subVPSDE', 'Residual']
     jobs = []
 
     method_configs = {
@@ -164,9 +178,9 @@ if __name__ == "__main__":
         'VESDE':
             {
                 'n_epochs': 200,
-                'bottleneck_channels': 1536,
+                'bottleneck_channels': 1024,
                 'num_res_blocks': 12,
-                'time_embed_dim': 256,
+                'time_embed_dim': 512,
                 'dropout': 0.1,
                 'lr': 2e-3,
                 'beta1': 0.9,
@@ -182,29 +196,11 @@ if __name__ == "__main__":
         'VPSDE':
             {
                 'n_epochs': 200,
-                'bottleneck_channels': 1536,
-                'num_res_blocks': 12,
-                'time_embed_dim': 256,
-                'dropout': 0.1,
-                'lr': 2e-3,
-                'beta1': 0.9,
-                'beta2': 0.999,
-                'eps': 1e-8,
-                'weight_decay': 0,
-                'continuous': True,
-                'reduce_mean': True,
-                'likelihood_weighting': False,
-                'beta_min': 0.1,
-                'beta_max': 50,
-            },
-        'subVPSDE':
-            {
-                'n_epochs': 200,
-                'bottleneck_channels': 1536,
-                'num_res_blocks': 12,
-                'time_embed_dim': 256,
-                'dropout': 0.25,
-                'lr': 2e-3,
+                'bottleneck_channels': 1024,
+                'num_res_blocks': 10,
+                'time_embed_dim': 512,
+                'dropout': 0.35,
+                'lr': 2.5e-4,
                 'beta1': 0.9,
                 'beta2': 0.999,
                 'eps': 1e-8,
@@ -213,7 +209,25 @@ if __name__ == "__main__":
                 'reduce_mean': True,
                 'likelihood_weighting': False,
                 'beta_min': 0.01,
-                'beta_max': 50,
+                'beta_max': 20,
+            },
+        'subVPSDE':
+            {
+                'n_epochs': 300,
+                'bottleneck_channels': 512,
+                'num_res_blocks': 11,
+                'time_embed_dim': 1024,
+                'dropout': 0.15,
+                'lr': 5e-4,
+                'beta1': 0.9,
+                'beta2': 0.999,
+                'eps': 1e-8,
+                'weight_decay': 0,
+                'continuous': True,
+                'reduce_mean': False,
+                'likelihood_weighting': False,
+                'beta_min': 0.5,
+                'beta_max': 25,
             },
     }
     device = 'cuda:0'
@@ -240,6 +254,9 @@ if __name__ == "__main__":
             "metrics": {
                 "AUC": float(res['id']['AUC']),
                 "FPR_95": float(res['id']['FPR_95']),
+                "score_id": float(res['id']['score_id']),
+                "score_ref": float(res['id']['score_ref']),
+                "loss": float(res['id']['loss']),
             },
         }
         means = {}  
@@ -254,17 +271,21 @@ if __name__ == "__main__":
                     "metrics": {
                         "AUC": float(res['AUC']),
                         "FPR_95": float(res['FPR_95']),
+                        "score": float(res['score_ood']),
                     },
                 })
                 if type_name not in means:
-                    means[type_name] = []
-                if "AUC" in means[type_name]:
+                    means[type_name] = {}
+                if "AUC" not in means[type_name]:
                     means[type_name]["AUC"] = []
-                if "FPR_95" in means[type_name]:
+                if "FPR_95" not in means[type_name]:
                     means[type_name]["FPR_95"] = []
+                if "score" not in means[type_name]:
+                    means[type_name]["score"] = []
                 
                 means[type_name]["AUC"].append(float(res['AUC']))
                 means[type_name]["FPR_95"].append(float(res['FPR_95']))
+                means[type_name]["score"].append(float(res['score_ood']))
         means = {k: {m: sum(v) / len(v) for m, v in metrics.items()} for k, metrics in means.items()}
         results[method][encoder][dataset]["means"] = means
 
