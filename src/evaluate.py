@@ -5,13 +5,16 @@ import ood_detectors.models as models
 import ood_detectors.losses as losses
 import ood_detectors.likelihood as likelihood
 import ood_detectors.eval_utils as eval_utils
+import ood_detectors.ops_utils as ops_utils
 import functools
 from ood_detectors.residual import Residual
 import pathlib
 import tqdm
 import yaml
+import multiprocessing as mp
+import random
 
-def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoints="checkpoints"):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoints="results"):
     train_data_path = data[encoder][dataset]["id"]["train"]
     batch_size = conf.get('batch_size', 1024)
     with open(train_data_path, 'rb') as f:
@@ -135,7 +138,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
     checkpoint_path = pathlib.Path(checkpoints)
     checkpoint_path.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = checkpoint_path / f"{method}_{dataset}_{encoder}_{mean_auc}.pt"
+    checkpoint_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
     torch.save({
         "config": conf,
         "model": ood_model.state_dict(),
@@ -146,9 +149,9 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     }, checkpoint_path)
     return results
 
-if __name__ == "__main__":
-    features = pathlib.Path(r"H:\arty\data\features_open_ood")
-    # features = pathlib.Path("/mnt/data/arty/data/features_open_ood")
+def objective(method, encoder, dataset, method_configs, device):
+    # features = pathlib.Path(r"H:\arty\data\features_opt")
+    features = pathlib.Path("/mnt/data/arty/data/features_opt")
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
@@ -160,15 +163,102 @@ if __name__ == "__main__":
             tmp = tmp[p]
         else:
             tmp[parts[-2]] = path
+    if pathlib.Path(f"results/{method}_{encoder}_{dataset}.yaml").exists():
+        return
+    results = {}
+    conf = method_configs[method]
+    res = run(conf, features_data, encoder, dataset, method, device)
+    if method not in results:
+        results[method] = {}
+    if encoder not in results[method]:
+        results[method][encoder] = {}
+    if dataset not in results[method][encoder]:
+        results[method][encoder][dataset] = {}
+    results[method][encoder][dataset]["id"] = {
+        "dataset": dataset+"_test",
+        "metrics": {
+            "AUC": float(res['id']['AUC']),
+            "FPR_95": float(res['id']['FPR_95']),
+            "score_id": float(res['id']['score_id']),
+            "score_ref": float(res['id']['score_ref']),
+            "loss": float(res['id']['loss']),
+        },
+    }
+    means = {}  
+    for type_name, datasets in res.items():
+        if type_name == 'id':
+            continue
+        if type_name not in results[method][encoder]:
+            results[method][encoder][dataset][type_name] = []
+        for dataset_name, res in datasets.items():
+            results[method][encoder][dataset][type_name].append({
+                "dataset": dataset_name,
+                "metrics": {
+                    "AUC": float(res['AUC']),
+                    "FPR_95": float(res['FPR_95']),
+                    "score": float(res['score_ood']),
+                },
+            })
+            if type_name not in means:
+                means[type_name] = {}
+            if "AUC" not in means[type_name]:
+                means[type_name]["AUC"] = []
+            if "FPR_95" not in means[type_name]:
+                means[type_name]["FPR_95"] = []
+            if "score" not in means[type_name]:
+                means[type_name]["score"] = []
+            
+            means[type_name]["AUC"].append(float(res['AUC']))
+            means[type_name]["FPR_95"].append(float(res['FPR_95']))
+            means[type_name]["score"].append(float(res['score_ood']))
+
+    pathlib.Path("results").mkdir(parents=True, exist_ok=True)
+    with open(f"results/{method}_{encoder}_{dataset}.yaml", "w") as f:
+        yaml.dump(results, f, sort_keys=False)
+
+def main():
+
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    datasets = ['imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
+    datasets = ['imagenet_sub', 'imagenet', 'imagenet200']
+    general_encoders = ['dino', 'dinov2', 'vit', 'clip']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit']
     # encoders = ['dinov2', 'vit', 'clip']
     open_ood_encoders = ['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     open_ood_datasets = ['cifar10', 'cifar100', 'imagenet200', 'imagenet']
     methods = ['subVPSDE', 'VESDE', 'VPSDE', 'Residual']
     # methods = ['subVPSDE', 'Residual']
     jobs = []
+    train_config = {
+        'n_epochs': 300,
+        'bottleneck_channels': 768,
+        'num_res_blocks': 10,
+        'time_embed_dim': 512,
+        'dropout': 0.3,
+        'lr':5e-5,
+        'beta1': 0.9,
+        'beta2': 0.999,
+        'eps': 1e-8,
+        'weight_decay': 0,
+        'continuous': True,
+        'reduce_mean': True,
+        'likelihood_weighting': False,
+    }
+    # train_config = {
+    #     'n_epochs': 300,
+    #     'bottleneck_channels': 1024,
+    #     'num_res_blocks': 11,
+    #     'time_embed_dim': 1024,
+    #     'dropout': 0.15,
+    #     'lr':5e-4,
+    #     'beta1': 0.9,
+    #     'beta2': 0.999,
+    #     'eps': 1e-8,
+    #     'weight_decay': 0,
+    #     'continuous': True,
+    #     'reduce_mean': True,
+    #     'likelihood_weighting': False,
+    # }
+
 
     method_configs = {
         'Residual':
@@ -177,117 +267,39 @@ if __name__ == "__main__":
             },
         'VESDE':
             {
-                'n_epochs': 200,
-                'bottleneck_channels': 1024,
-                'num_res_blocks': 12,
-                'time_embed_dim': 512,
-                'dropout': 0.1,
-                'lr': 2e-3,
-                'beta1': 0.9,
-                'beta2': 0.999,
-                'eps': 1e-8,
-                'weight_decay': 0,
-                'continuous': True,
-                'reduce_mean': True,
-                'likelihood_weighting': False,
-                'sigma_min': 0.1,
-                'sigma_max': 50,
+                **train_config,
+                'sigma_min': 0.05,
+                'sigma_max': 30,
             },
         'VPSDE':
             {
-                'n_epochs': 200,
-                'bottleneck_channels': 1024,
-                'num_res_blocks': 10,
-                'time_embed_dim': 512,
-                'dropout': 0.35,
-                'lr': 2.5e-4,
-                'beta1': 0.9,
-                'beta2': 0.999,
-                'eps': 1e-8,
-                'weight_decay': 0,
-                'continuous': True,
-                'reduce_mean': True,
-                'likelihood_weighting': False,
-                'beta_min': 0.01,
-                'beta_max': 20,
+                **train_config,
+                'beta_min': 0.5,
+                'beta_max': 15,
             },
         'subVPSDE':
             {
-                'n_epochs': 300,
-                'bottleneck_channels': 512,
-                'num_res_blocks': 11,
-                'time_embed_dim': 1024,
-                'dropout': 0.15,
-                'lr': 5e-4,
-                'beta1': 0.9,
-                'beta2': 0.999,
-                'eps': 1e-8,
-                'weight_decay': 0,
-                'continuous': True,
-                'reduce_mean': False,
-                'likelihood_weighting': False,
+                **train_config,
                 'beta_min': 0.5,
-                'beta_max': 25,
+                'beta_max': 15,
             },
     }
-    device = 'cuda:0'
+
     for m in methods:
-        for e in encoders:
+        for e in encoders+general_encoders:
             for d in datasets:
-                jobs.append((m, e, d))
+                jobs.append((m, e, d, method_configs))
 
         for e, d in zip(open_ood_encoders, open_ood_datasets):
-            jobs.append((m, e, d))
-    results = {}
-    for job in tqdm.tqdm(jobs):
-        method, encoder, dataset = job
-        conf = method_configs[method]
-        res = run(conf, features_data, encoder, dataset, method, device)
-        if method not in results:
-            results[method] = {}
-        if encoder not in results[method]:
-            results[method][encoder] = {}
-        if dataset not in results[method][encoder]:
-            results[method][encoder][dataset] = {}
-        results[method][encoder][dataset]["id"] = {
-            "dataset": dataset+"_test",
-            "metrics": {
-                "AUC": float(res['id']['AUC']),
-                "FPR_95": float(res['id']['FPR_95']),
-                "score_id": float(res['id']['score_id']),
-                "score_ref": float(res['id']['score_ref']),
-                "loss": float(res['id']['loss']),
-            },
-        }
-        means = {}  
-        for type_name, datasets in res.items():
-            if type_name == 'id':
-                continue
-            if type_name not in results[method][encoder]:
-                results[method][encoder][dataset][type_name] = []
-            for dataset_name, res in datasets.items():
-                results[method][encoder][dataset][type_name].append({
-                    "dataset": dataset_name,
-                    "metrics": {
-                        "AUC": float(res['AUC']),
-                        "FPR_95": float(res['FPR_95']),
-                        "score": float(res['score_ood']),
-                    },
-                })
-                if type_name not in means:
-                    means[type_name] = {}
-                if "AUC" not in means[type_name]:
-                    means[type_name]["AUC"] = []
-                if "FPR_95" not in means[type_name]:
-                    means[type_name]["FPR_95"] = []
-                if "score" not in means[type_name]:
-                    means[type_name]["score"] = []
-                
-                means[type_name]["AUC"].append(float(res['AUC']))
-                means[type_name]["FPR_95"].append(float(res['FPR_95']))
-                means[type_name]["score"].append(float(res['score_ood']))
-        means = {k: {m: sum(v) / len(v) for m, v in metrics.items()} for k, metrics in means.items()}
-        results[method][encoder][dataset]["means"] = means
+            jobs.append((m, e, d, method_configs))
 
-        with open("results.yaml", "w") as f:
-            yaml.dump(results, f, sort_keys=False)
+    
+    gpu_nodes = [0, 1, 2, 3] * 2
+    random.shuffle(jobs)
+    print(f'Running {len(jobs)} jobs...')
+    ops_utils.parallelize(objective, jobs, gpu_nodes, verbose=True, timeout=60*60*24)
+
+
+if __name__ == '__main__':
+    mp.freeze_support()
+    main()
