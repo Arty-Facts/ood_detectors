@@ -44,7 +44,7 @@ def encode_dataset(encoder_name, dataset_name, device):
                 pickle.dump(data, f)
 def main():
 
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'vit_b16', 'swin_t']
     datasets = ['cifar10', 'cifar100', 'covid', 'mnist', 'imagenet', 'imagenet200']
     gpu_nodes = [0, 1, 2, 3]*2
 

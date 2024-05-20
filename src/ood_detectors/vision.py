@@ -99,9 +99,25 @@ class ViT_B_16(BASE_ViT):
         "IMAGENET1K_SWAG_LINEAR_V1": torchvision.models.ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
     }
     def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'vii_b_16_{weights}'
+        self.name = f'vit_b_16'
         super().__init__()
         self.model = load_model(self, torchvision.models.vit_b_16, model_dir_path, weights)
+
+
+    def features(self, x):
+        # Reshape and permute the input tensor
+        x = self.model._process_input(x)
+        n = x.shape[0]
+
+        # Expand the class token to the full batch
+        batch_class_token = self.model.class_token.expand(n, -1, -1)
+        x = torch.cat([batch_class_token, x], dim=1)
+
+        x = self.model.encoder(x)
+
+        # Classifier "token" as used by standard language architectures
+        x = x[:, 0]
+        return x
 
  
 class ViT_B_32(BASE_ViT):
@@ -386,6 +402,44 @@ class ResNet50(ResNet):
     def forward(self, x):
         return self.fc(self.features(x))
 
+class Swin_T(torchvision.models.swin_transformer.SwinTransformer):
+    def __init__(self,
+                 patch_size=[4, 4],
+                 embed_dim=96,
+                 depths=[2, 2, 6, 2],
+                 num_heads=[3, 6, 12, 24],
+                 window_size=[7, 7],
+                 stochastic_depth_prob=0.2,
+                 num_classes=1000):
+        super().__init__(patch_size=patch_size,
+                             embed_dim=embed_dim,
+                             depths=depths,
+                             num_heads=num_heads,
+                             window_size=window_size,
+                             stochastic_depth_prob=stochastic_depth_prob,
+                             num_classes=num_classes,
+                             weights=torchvision.models.Swin_T_Weights.IMAGENET1K_V1)
+        self.name = "swin_t"
+        self.feature_size = embed_dim * 2**(len(depths) - 1)
+        self.transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize((224, 224)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+
+    def features(self, x):
+        x = self.features(x)
+        x = self.norm(x)
+        x = self.permute(x)
+        x = self.avgpool(x)
+        x = self.flatten(x)
+        return x
+
+    def forward(self, x):
+        x = self.features(x)
+        return self.head(x)
+
+
 normalization_dict = {
     'cifar10': [[0.4914, 0.4822, 0.4465], [0.2470, 0.2435, 0.2616]],
     'cifar100': [[0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]],
@@ -463,7 +517,7 @@ data_list_open_ood = [
     'bimcv',
 ]
 
-AVAILABLE_ENCODERS = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
+AVAILABLE_ENCODERS = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'vit_b16', 'clip', 'swin_t', 'resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
 
 def download_and_extract(hash, checkpoint_path):
     gdown.download(id=hash, output=str(checkpoint_path / f"{hash}.zip") )
@@ -488,6 +542,10 @@ def get_encoder(name):
         return DinoV2_ViT_B_14()
     elif name in ['vit','vit_p16']:
         return ViT_P16_21k()
+    elif name in ['vit_b16']:
+        return ViT_L_16()
+    elif name in ['swin_t']:
+        return Swin_T()
     elif name in ['clip']:
         return ClipVisionModel()
     elif name in ['resnet18_32x32_cifar10_open_ood']:
