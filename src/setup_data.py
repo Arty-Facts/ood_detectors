@@ -11,7 +11,7 @@ import multiprocessing as mp
 def encode_dataset(encoder_name, dataset_name, device):
     data_root = '/mnt/data/arty/data'
     image_list_root = '/mnt/data/arty/data/benchmark_imglist'
-    features = pathlib.Path("/mnt/data/arty/data/features_open_ood")
+    features = pathlib.Path("/mnt/data/arty/data/features_opt_extra")
     features.mkdir(exist_ok=True)
     encoder_path = features / encoder_name
     encoder_path.mkdir(exist_ok=True)
@@ -44,21 +44,23 @@ def encode_dataset(encoder_name, dataset_name, device):
                 pickle.dump(data, f)
 def main():
 
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'vit_b16', 'swin_t']
-    datasets = ['cifar10', 'cifar100', 'covid', 'mnist', 'imagenet', 'imagenet200']
-    gpu_nodes = [0, 1, 2, 3]*2
+    # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'vit_b16', 'swin_t']
+    encoders = ['vit_b16', 'swin_t']
+    # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100']
+    datasets = ['imagenet']
+    gpu_nodes = [0, 1, 2, 3]
 
     jobs = []
     for encoder_name in encoders:
         for dataset_name in datasets:
             jobs.append((encoder_name, dataset_name))
         
-    for encoder_name, dataset_name in zip(['resnet18_32x32_cifar10_open_ood', 
-                                'resnet18_32x32_cifar100_open_ood', 
-                                'resnet18_224x224_imagenet200_open_ood', 
-                                'resnet50_224x224_imagenet_open_ood'],
-                                ['cifar10', 'cifar100', 'imagenet200', 'imagenet']):
-        jobs.append((encoder_name, dataset_name))
+    # for encoder_name, dataset_name in zip(['resnet18_32x32_cifar10_open_ood', 
+    #                             'resnet18_32x32_cifar100_open_ood', 
+    #                             'resnet18_224x224_imagenet200_open_ood', 
+    #                             'resnet50_224x224_imagenet_open_ood'],
+    #                             ['cifar10', 'cifar100', 'imagenet200', 'imagenet']):
+    #     jobs.append((encoder_name, dataset_name))
 
     print(len(jobs))
     random.shuffle(jobs)

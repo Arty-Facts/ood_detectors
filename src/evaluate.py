@@ -27,7 +27,13 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     if method == 'Residual':
         dims = conf['dims']
         ood_model = Residual(dims=dims)
-        loss = ood_model.fit(data_train)
+        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+            checkpoint = torch.load(model_path)
+            ood_model.load_state_dict(checkpoint['model'])
+            loss = [checkpoint['results']['id']['loss']]
+        else:
+            loss = ood_model.fit(data_train)
     else:
 
         # Hyperparameters
@@ -87,14 +93,19 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             reduce_mean=reduce_mean,
             likelihood_weighting=likelihood_weighting,
             )
-        
-        loss = ood_model.fit(
-            data_train,
-            n_epochs=n_epochs,
-            batch_size=batch_size,
-            update_fn=update_fn,
-            verbose=verbose,
-        )
+        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+            checkpoint = torch.load(model_path)
+            ood_model.load_state_dict(checkpoint['model'])
+            loss = [checkpoint['results']['id']['loss']]
+        else:
+            loss = ood_model.fit(
+                data_train,
+                n_epochs=n_epochs,
+                batch_size=batch_size,
+                update_fn=update_fn,
+                verbose=verbose,
+            )
 
     score_id = ood_model.predict(data_train, batch_size, verbose=verbose)
     test_data_path = data[encoder][dataset]["id"]["test"]
@@ -107,6 +118,10 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
 
     score_ref = ood_model.predict(data_test, batch_size, verbose=verbose)
     results = {}
+    scores = {
+        'score_id': score_id,
+        'score_ref': score_ref,
+    }
     id_auc = eval_utils.auc(-score_ref, -score_id)
     id_fpr_95 = eval_utils.fpr(-score_ref, -score_id, 0.95)
     results['id'] = {'AUC': id_auc, 
@@ -134,11 +149,14 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
                                         'FPR_95': ood_fpr_95,
                                         'score_ood': score_ood.mean().item(),
                                         }
+            if name not in scores:
+                scores[name] = {}
+            scores[name][type_name] = score_ood
             ood_auc_mean.append(ood_auc)
     mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
     checkpoint_path = pathlib.Path(checkpoints)
     checkpoint_path.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
+    model_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
     torch.save({
         "config": conf,
         "model": ood_model.state_dict(),
@@ -146,10 +164,13 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
         "method": method,
         "encoder": encoder,
         "dataset": dataset,
-    }, checkpoint_path)
+    }, model_path)
+
+    with open(checkpoint_path/f"{method}_{dataset}_{encoder}_scores.pkl", 'wb') as f:
+        pickle.dump(scores, f)
     return results
 
-def objective(method, encoder, dataset, method_configs, device):
+def objective(method, encoder, dataset, method_configs, checkpoints, device):
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     features = pathlib.Path("/mnt/data/arty/data/features_opt")
     features_data = {}
@@ -163,11 +184,11 @@ def objective(method, encoder, dataset, method_configs, device):
             tmp = tmp[p]
         else:
             tmp[parts[-2]] = path
-    if pathlib.Path(f"results/{method}_{encoder}_{dataset}.yaml").exists():
+    if pathlib.Path(f"{checkpoints}/{method}_{encoder}_{dataset}_scores.yaml").exists():
         return
     results = {}
     conf = method_configs[method]
-    res = run(conf, features_data, encoder, dataset, method, device)
+    res = run(conf, features_data, encoder, dataset, method, device, checkpoints=checkpoints)
     if method not in results:
         results[method] = {}
     if encoder not in results[method]:
@@ -216,17 +237,17 @@ def objective(method, encoder, dataset, method_configs, device):
     with open(f"results/{method}_{encoder}_{dataset}.yaml", "w") as f:
         yaml.dump(results, f, sort_keys=False)
 
-def main():
+def main(checkpoint = "results"):
 
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet_sub', 'imagenet', 'imagenet200']
     general_encoders = ['dino', 'dinov2', 'vit', 'clip']
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'swin_t', 'vit_b16']
     # encoders = ['dinov2', 'vit', 'clip']
     open_ood_encoders = ['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     open_ood_datasets = ['cifar10', 'cifar100', 'imagenet200', 'imagenet']
     methods = ['subVPSDE', 'VESDE', 'VPSDE', 'Residual']
-    # methods = ['subVPSDE', 'Residual']
+    # methods = ['Residual']
     jobs = []
     train_config = {
         'n_epochs': 300,
@@ -244,11 +265,11 @@ def main():
         'likelihood_weighting': False,
     }
     # train_config = {
-    #     'n_epochs': 300,
-    #     'bottleneck_channels': 1024,
-    #     'num_res_blocks': 11,
-    #     'time_embed_dim': 1024,
-    #     'dropout': 0.15,
+    #     'n_epochs': 100,
+    #     'bottleneck_channels': 512,
+    #     'num_res_blocks': 4,
+    #     'time_embed_dim': 512,
+    #     'dropout': 0.0,
     #     'lr':5e-4,
     #     'beta1': 0.9,
     #     'beta2': 0.999,
@@ -288,10 +309,10 @@ def main():
     for m in methods:
         for e in encoders+general_encoders:
             for d in datasets:
-                jobs.append((m, e, d, method_configs))
+                jobs.append((m, e, d, method_configs, checkpoint))
 
         for e, d in zip(open_ood_encoders, open_ood_datasets):
-            jobs.append((m, e, d, method_configs))
+            jobs.append((m, e, d, method_configs, checkpoint))
 
     
     gpu_nodes = [0, 1, 2, 3] * 2

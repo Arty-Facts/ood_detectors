@@ -99,9 +99,10 @@ class ViT_B_16(BASE_ViT):
         "IMAGENET1K_SWAG_LINEAR_V1": torchvision.models.ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
     }
     def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'vit_b_16'
+        self.name = f'ViT_B_16_{weights}'
         super().__init__()
         self.model = load_model(self, torchvision.models.vit_b_16, model_dir_path, weights)
+        self.name = f'vit_b_16'
 
 
     def features(self, x):
@@ -125,9 +126,10 @@ class ViT_B_32(BASE_ViT):
         "IMAGENET1K_V1": torchvision.models.ViT_B_32_Weights.IMAGENET1K_V1,
     }
     def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'vit_b_32_{weights}'
+        self.name = f'ViT_B_32_{weights}'
         super().__init__()
         self.model = load_model(self, torchvision.models.vit_b_32, model_dir_path, weights)
+        self.name = f'vit_b_32'
 
   
 
@@ -138,9 +140,10 @@ class ViT_L_16(BASE_ViT):
         "IMAGENET1K_SWAG_LINEAR_V1": torchvision.models.ViT_L_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
     }
     def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'vit_l_16_{weights}'
+        self.name = f'ViT_L_16_{weights}'
         super().__init__()
         self.model = load_model(self, torchvision.models.vit_l_16, model_dir_path, weights)
+        self.name = f'vit_l_16'
 
    
 
@@ -150,8 +153,9 @@ class VIT_L_32(BASE_ViT):
     }
     def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
         super().__init__()
-        self.name = f'vit_l_32_{weights}'
+        self.name = f'ViT_L_32_{weights}'
         self.model = load_model(self, torchvision.models.vit_l_32, model_dir_path, weights)
+        self.name = f'vit_l_32'
 
 class Dino_ViT_B_16(torch.nn.Module):
     def __init__(self):
@@ -402,25 +406,11 @@ class ResNet50(ResNet):
     def forward(self, x):
         return self.fc(self.features(x))
 
-class Swin_T(torchvision.models.swin_transformer.SwinTransformer):
-    def __init__(self,
-                 patch_size=[4, 4],
-                 embed_dim=96,
-                 depths=[2, 2, 6, 2],
-                 num_heads=[3, 6, 12, 24],
-                 window_size=[7, 7],
-                 stochastic_depth_prob=0.2,
-                 num_classes=1000):
-        super().__init__(patch_size=patch_size,
-                             embed_dim=embed_dim,
-                             depths=depths,
-                             num_heads=num_heads,
-                             window_size=window_size,
-                             stochastic_depth_prob=stochastic_depth_prob,
-                             num_classes=num_classes,
-                             weights=torchvision.models.Swin_T_Weights.IMAGENET1K_V1)
+class Swin_T(nn.Module):
+    def __init__(self):
+        super().__init__()
         self.name = "swin_t"
-        self.feature_size = embed_dim * 2**(len(depths) - 1)
+        self.model = torchvision.models.swin_t(weights=torchvision.models.Swin_T_Weights.IMAGENET1K_V1)
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((224, 224)),
             torchvision.transforms.ToTensor(),
@@ -428,16 +418,16 @@ class Swin_T(torchvision.models.swin_transformer.SwinTransformer):
         ])
 
     def features(self, x):
-        x = self.features(x)
-        x = self.norm(x)
-        x = self.permute(x)
-        x = self.avgpool(x)
-        x = self.flatten(x)
+        x = self.model.features(x)
+        x = self.model.norm(x)
+        x = self.model.permute(x)
+        x = self.model.avgpool(x)
+        x = self.model.flatten(x)
         return x
 
     def forward(self, x):
-        x = self.features(x)
-        return self.head(x)
+        x = self.model.features(x)
+        return self.model.head(x)
 
 
 normalization_dict = {
@@ -543,7 +533,7 @@ def get_encoder(name):
     elif name in ['vit','vit_p16']:
         return ViT_P16_21k()
     elif name in ['vit_b16']:
-        return ViT_L_16()
+        return ViT_B_16()
     elif name in ['swin_t']:
         return Swin_T()
     elif name in ['clip']:

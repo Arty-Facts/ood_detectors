@@ -68,32 +68,49 @@ class Residual:
         ).astype(np.float32)
         return [-1]
 
-    def predict(self, data, *args, collate_fn=None, **kwargs):
+    def predict(self, data, batch_size=32, *args, collate_fn=None, **kwargs):
         """
-        Predict the outlier scores for the given data.
+        Predict the outlier scores for the given data in batches.
 
         Args:
-            data (array-like or torch.Tensor or torch.utils.data.DataLoader): Input data for predicting the outlier scores.
+            data (array-like, torch.Tensor, torch.utils.data.DataLoader, or torch.utils.data.Dataset): Input data for predicting the outlier scores.
+            batch_size (int): The size of the batches to use for prediction.
             *args: Additional positional arguments.
             **kwargs: Additional keyword arguments.
 
         Returns:
             numpy.ndarray: Outlier scores for the input data.
-
         """
-        if isinstance(data, (list, tuple)):
-            data = np.array(data)
+        def to_numpy(data_batch):
+            if isinstance(data_batch, torch.Tensor):
+                return data_batch.cpu().numpy()
+            elif isinstance(data_batch, (list, tuple)):
+                return np.array(data_batch)
+            return data_batch
+
+        if isinstance(data, (list, tuple, np.ndarray)):
+            data = torch.tensor(data, dtype=torch.float32)
+            dataset = torch.utils.data.TensorDataset(data)
+            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
         elif isinstance(data, torch.Tensor):
-            data = data.cpu().numpy()
+            dataset = torch.utils.data.TensorDataset(data)
+            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
         elif isinstance(data, torch.utils.data.Dataset):
-            if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
-                collate_fn = data.collate_fn
-            if collate_fn is None:
-                data = np.vstack([x.cpu().numpy() for x, *_ in data])
-            else:
-                data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
-        data = data.astype(np.float32)
-        return np.linalg.norm((data - self.u) @ self.ns, axis=-1)
+            data_loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+        elif isinstance(data, torch.utils.data.DataLoader):
+            data_loader = data
+        else:
+            raise TypeError("Unsupported data type: {}".format(type(data)))
+
+        scores = []
+        for batch in data_loader:
+            batch = batch[0]  # TensorDataset returns a tuple
+            batch_numpy = to_numpy(batch)
+            batch_numpy = batch_numpy.astype(np.float32)
+            batch_scores = np.linalg.norm((batch_numpy - self.u) @ self.ns, axis=-1)
+            scores.append(batch_scores)
+
+        return np.concatenate(scores)
 
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
