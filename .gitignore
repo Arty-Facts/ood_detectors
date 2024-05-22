@@ -19,5 +19,6 @@ src/.nfs*
 src/optuna_v2.db
 src/out.txt
 src/*.png
-src/results/*
 src/*.pt
+src/results*/*
+src/out_*.txt

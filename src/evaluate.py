@@ -184,7 +184,7 @@ def objective(method, encoder, dataset, method_configs, checkpoints, device):
             tmp = tmp[p]
         else:
             tmp[parts[-2]] = path
-    if pathlib.Path(f"{checkpoints}/{method}_{encoder}_{dataset}_scores.yaml").exists():
+    if pathlib.Path(f"{checkpoints}/{method}_{encoder}_{dataset}_scores.pkl").exists():
         return
     results = {}
     conf = method_configs[method]
@@ -237,24 +237,39 @@ def objective(method, encoder, dataset, method_configs, checkpoints, device):
     with open(f"results/{method}_{encoder}_{dataset}.yaml", "w") as f:
         yaml.dump(results, f, sort_keys=False)
 
-def main(checkpoint = "results"):
+def main(checkpoint = "results_v3"):
 
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
-    datasets = ['imagenet_sub', 'imagenet', 'imagenet200']
+    datasets = ['imagenet_sub', 'imagenet', 'imagenet200', 'cifar10', 'cifar100']
     general_encoders = ['dino', 'dinov2', 'vit', 'clip']
     encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'swin_t', 'vit_b16']
     # encoders = ['dinov2', 'vit', 'clip']
     open_ood_encoders = ['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     open_ood_datasets = ['cifar10', 'cifar100', 'imagenet200', 'imagenet']
-    methods = ['subVPSDE', 'VESDE', 'VPSDE', 'Residual']
+    methods = ['subVPSDE', 'VESDE', 'VPSDE']
     # methods = ['Residual']
     jobs = []
+    # train_config = {
+    #     'n_epochs': 300,
+    #     'bottleneck_channels': 768,
+    #     'num_res_blocks': 10,
+    #     'time_embed_dim': 512,
+    #     'dropout': 0.3,
+    #     'lr':5e-5,
+    #     'beta1': 0.9,
+    #     'beta2': 0.999,
+    #     'eps': 1e-8,
+    #     'weight_decay': 0,
+    #     'continuous': True,
+    #     'reduce_mean': True,
+    #     'likelihood_weighting': False,
+    # }
     train_config = {
-        'n_epochs': 300,
-        'bottleneck_channels': 768,
-        'num_res_blocks': 10,
+        'n_epochs': 500,
+        'bottleneck_channels': 512,
+        'num_res_blocks': 5,
         'time_embed_dim': 512,
-        'dropout': 0.3,
+        'dropout': 0.0,
         'lr':5e-5,
         'beta1': 0.9,
         'beta2': 0.999,
@@ -264,27 +279,12 @@ def main(checkpoint = "results"):
         'reduce_mean': True,
         'likelihood_weighting': False,
     }
-    # train_config = {
-    #     'n_epochs': 100,
-    #     'bottleneck_channels': 512,
-    #     'num_res_blocks': 4,
-    #     'time_embed_dim': 512,
-    #     'dropout': 0.0,
-    #     'lr':5e-4,
-    #     'beta1': 0.9,
-    #     'beta2': 0.999,
-    #     'eps': 1e-8,
-    #     'weight_decay': 0,
-    #     'continuous': True,
-    #     'reduce_mean': True,
-    #     'likelihood_weighting': False,
-    # }
 
 
     method_configs = {
         'Residual':
             {
-                'dims': 0.5,
+                'dims': None,
             },
         'VESDE':
             {
