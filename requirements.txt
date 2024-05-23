@@ -11,7 +11,7 @@ seaborn
 tqdm
 einops
 torchdiffeq 
-git+https://github.com/openai/CLIP.git
+git+https://github.com/openai/CLIP.git@main#egg=clip
 timm
 openmim
 gdown
