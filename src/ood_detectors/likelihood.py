@@ -35,7 +35,7 @@ class Likelihood:
     def __init__(self, sde, 
                  optimizer=functools.partial(
                     optim.Adam,
-                    lr=0.0002,
+                    lr=5e-5,
                     betas=(0.9, 0.999),
                     eps=1e-8,
                     weight_decay=0,
@@ -105,7 +105,7 @@ class Likelihood:
 
         """
         if update_fn is None:
-            update_fn = losses.SDE_EMA_Warmup_GradClip(
+            update_fn = losses.SDE_BF16(
                 sde=self.sde,
                 model=self.model,
                 optimizer=self.optimizer,
@@ -149,7 +149,7 @@ class Likelihood:
         """
         return self.predict(*args, **kwargs)
     
-def VESDE_DDM(feat_dim):
+def VESDE_RDM(feat_dim):
     """Creates a Likelihood object for Variational Ensemble SDE with Dependency Detection Model.
 
     Args:
@@ -159,9 +159,9 @@ def VESDE_DDM(feat_dim):
         Likelihood: The Likelihood object.
 
     """
-    return Likelihood(VESDE(sigma_min=0.01, sigma_max=50, N=1000), feat_dim=feat_dim)
+    return Likelihood(VESDE(sigma_min=0.05, sigma_max=30, N=1000), feat_dim=feat_dim)
 
-def SubSDE_DDM(feat_dim):
+def SubSDE_RDM(feat_dim):
     """Creates a Likelihood object for Sub-Variational Poisson SDE with Dependency Detection Model.
 
     Args:
@@ -171,9 +171,9 @@ def SubSDE_DDM(feat_dim):
         Likelihood: The Likelihood object.
 
     """
-    return Likelihood(subVPSDE(beta_min=0.1, beta_max=20, N=1000), feat_dim=feat_dim)
+    return Likelihood(subVPSDE(beta_min=0.5, beta_max=15, N=1000), feat_dim=feat_dim)
 
-def VPSDE_DDM(feat_dim):
+def VPSDE_RDM(feat_dim):
     """Creates a Likelihood object for Variational Poisson SDE with Dependency Detection Model.
 
     Args:
@@ -183,4 +183,4 @@ def VPSDE_DDM(feat_dim):
         Likelihood: The Likelihood object.
 
     """
-    return Likelihood(VPSDE(beta_min=0.1, beta_max=20, N=1000),feat_dim=feat_dim)
+    return Likelihood(VPSDE(beta_min=0.5, beta_max=15, N=1000),feat_dim=feat_dim)

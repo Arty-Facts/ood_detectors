@@ -125,9 +125,9 @@ class SimpleMLP(nn.Module):
     def __init__(
         self,
         channels,
-        time_embed_dim=256,
-        bottleneck_channels=1536,
-        num_res_blocks=13,
+        time_embed_dim=512,
+        bottleneck_channels=512,
+        num_res_blocks=5,
         dropout=0,
         use_context=False,
         context_channels=512
