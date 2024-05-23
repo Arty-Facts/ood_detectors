@@ -2,7 +2,6 @@ import timm
 import torch
 import torchvision
 import pathlib, requests, pathlib, gdown, zipfile
-import clip
 from torchvision.datasets import ImageFolder
 from ood_detectors.list_dataset import ImageFilelist
 import torch.nn as nn
@@ -259,6 +258,7 @@ class ViT_P16_21k(torch.nn.Module):
     
 class ClipVisionModel(torch.nn.Module):
     def __init__(self):
+        import clip
         super().__init__()
         self.name = 'CLIP'
         self.model, self.transform = clip.load("ViT-B/32", device='cpu')
