@@ -4,6 +4,7 @@ from ood_detectors.models import SimpleMLP
 from ood_detectors.sde import VESDE, subVPSDE, VPSDE
 import torch.optim as optim
 import functools
+import numpy as np
 
 
 class Likelihood:
@@ -184,3 +185,51 @@ def RDM_VPSDE(feat_dim):
 
     """
     return Likelihood(VPSDE(beta_min=0.5, beta_max=15, N=1000),feat_dim=feat_dim)
+
+
+class RDM():
+    def __init__(self, feat_dim, k=2):
+        super().__init__()
+        self.feat_dim = feat_dim
+        self.k = k
+        self.ood_detectors = [
+            RDM_SubSDE(feat_dim) for _ in range(k)
+        ]
+        self.name = f"RDM_{self.ood_detectors[0].name}x{k}"
+        self.device = "cpu"
+
+    def to(self, device):
+        self.device = device
+        return self
+
+    def load_state_dict(self, state_dict):
+        for ood_detector, state_dict_ in zip(self.ood_detectors, state_dict):
+            ood_detector.load_state_dict(state_dict_)
+
+    def state_dict(self):
+        return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
+    
+    def fit(self, dataset, n_epochs, batch_size, num_workers=0, update_fn=None, verbose=True, collate_fn=None):
+        losses = []
+        for ood_detector in self.ood_detectors:
+            ood_detector.to(self.device)
+            loss = ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose, collate_fn)
+            ood_detector.to("cpu")
+            losses.append(loss)
+        return losses
+    
+    def predict(self, x, *args, reduce=True, **kwargs):
+        results = []
+        for ood_detector in self.ood_detectors:
+            ood_detector.to(self.device)
+            result = ood_detector.predict(x, *args, **kwargs)
+            ood_detector.to("cpu")
+            results.append(result)
+        if reduce:
+            return np.stack(results).mean(axis=0)
+        else:
+            return np.stack(results)
+    
+
+
+        

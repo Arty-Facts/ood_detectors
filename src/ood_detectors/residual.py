@@ -153,3 +153,35 @@ class Residual:
         self.u = state_dict["u"]
         self.ns = state_dict["ns"]
         return self
+
+
+class ResidualX():
+    def __init__(self, k=2):
+        super().__init__()
+        linspaces = np.linspace(0.2, 0.5, k)
+        self.ood_detectors = [Residual(dims=linspace) for linspace in linspaces]
+        self.name = f"Residualx{k}"
+        self.device = "cpu"
+
+    def to(self, device):
+        self.device = device
+        return self
+    
+    def load_state_dict(self, state_dict):
+        for ood_detector, state_dict in zip(self.ood_detectors, state_dict):
+            ood_detector.load_state_dict(state_dict)
+        return self
+    
+    def state_dict(self):
+        return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
+    
+    def fit(self, data, *args, **kwargs):
+        return [ood_detector.fit(data, *args, **kwargs) for ood_detector in self.ood_detectors]
+    
+    def predict(self, x, *args, reduce=True, **kwargs):
+        if reduce:
+            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in self.ood_detectors]).mean(axis=0)
+        else:
+            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in self.ood_detectors])
+    
+    
