@@ -100,6 +100,8 @@ class Residual:
             dataset = torch.utils.data.TensorDataset(data)
             data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
         elif isinstance(data, torch.utils.data.Dataset):
+            if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
+                collate_fn = data.collate_fn
             data_loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
         elif isinstance(data, torch.utils.data.DataLoader):
             data_loader = data
