@@ -99,8 +99,12 @@ def eval_ood(
     score_ref = model.predict(
         reference_dataset, batch_size, num_workers, verbose=verbose
     )
-    ref_auc = auc(-score_ref, -score_id)
-    ref_fpr = fpr(-score_ref, -score_id, recall)
+    if score_ref.ndim > 1:
+        ref_auc = auc(-np.mean(score_ref, axis=0), -np.mean(score_id, axis=0))
+        ref_fpr = fpr(-np.mean(score_ref, axis=0), -np.mean(score_id, axis=0), recall)
+    else:
+        ref_auc = auc(-score_ref, -score_id)
+        ref_fpr = fpr(-score_ref, -score_id, recall)
     if verbose:
         print(f"AUC: {ref_auc:.4f}, FPR: {ref_fpr:.4f}")
     score_oods = []
@@ -111,9 +115,13 @@ def eval_ood(
             print(f"Running eval. Out-of-distribution data {i+1}/{len(ood_datasets)}")
         score_ood = model.predict(ood_dataset, batch_size, num_workers, verbose=verbose)
         score_oods.append(score_ood)
-        auc_ood = auc(-score_ref, -score_ood)
+        if score_ood.ndim > 1:
+            auc_ood = auc(-np.mean(score_ref, axis=0), -np.mean(score_ood, axis=0))
+            fpr_ood = fpr(-np.mean(score_ref, axis=0), -np.mean(score_ood, axis=0), recall)
+        else:
+            auc_ood = auc(-score_ref, -score_ood)
+            fpr_ood = fpr(-score_ref, -score_ood, recall)
         auc_oods.append(auc_ood)
-        fpr_ood = fpr(-score_ref, -score_ood, recall)
         fpr_oods.append(fpr_ood)
         if verbose:
             print(f"AUC: {auc_ood:.4f}, FPR: {fpr_ood:.4f}")
