@@ -149,7 +149,7 @@ class Likelihood:
         """
         return self.predict(*args, **kwargs)
     
-def VESDE_RDM(feat_dim):
+def RDM_VESDE(feat_dim):
     """Creates a Likelihood object for Variational Ensemble SDE with Dependency Detection Model.
 
     Args:
@@ -161,7 +161,7 @@ def VESDE_RDM(feat_dim):
     """
     return Likelihood(VESDE(sigma_min=0.05, sigma_max=30, N=1000), feat_dim=feat_dim)
 
-def SubSDE_RDM(feat_dim):
+def RDM_SubSDE(feat_dim):
     """Creates a Likelihood object for Sub-Variational Poisson SDE with Dependency Detection Model.
 
     Args:
@@ -173,7 +173,7 @@ def SubSDE_RDM(feat_dim):
     """
     return Likelihood(subVPSDE(beta_min=0.5, beta_max=15, N=1000), feat_dim=feat_dim)
 
-def VPSDE_RDM(feat_dim):
+def RDM_VPSDE(feat_dim):
     """Creates a Likelihood object for Variational Poisson SDE with Dependency Detection Model.
 
     Args:
