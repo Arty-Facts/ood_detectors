@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.covariance import EmpiricalCovariance
 import torch
+import tqdm
 
 
 class Residual:
@@ -175,13 +176,22 @@ class ResidualX():
     def state_dict(self):
         return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
     
-    def fit(self, data, *args, **kwargs):
-        return [ood_detector.fit(data, *args, **kwargs) for ood_detector in self.ood_detectors]
-    
-    def predict(self, x, *args, reduce=True, **kwargs):
-        if reduce:
-            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in self.ood_detectors]).mean(axis=0)
+    def fit(self, data, *args, verbose=True, **kwargs):
+        if verbose:
+            iter = tqdm.tqdm(self.ood_detectors)
         else:
-            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in self.ood_detectors])
+            iter = self.ood_detectors
+        return [ood_detector.fit(data, *args, **kwargs) for ood_detector in iter]
+    
+    def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
+        if verbose:
+            iter = tqdm.tqdm(self.ood_detectors)
+        else:
+            iter = self.ood_detectors
+        
+        if reduce:
+            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter]).mean(axis=0)
+        else:
+            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter])
     
     

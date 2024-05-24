@@ -5,7 +5,7 @@ from ood_detectors.sde import VESDE, subVPSDE, VPSDE
 import torch.optim as optim
 import functools
 import numpy as np
-
+import tqdm
 
 class Likelihood:
     """Base class for likelihood function implementations for different SDEs with dependency injection.
@@ -211,18 +211,26 @@ class RDM():
     
     def fit(self, dataset, n_epochs, batch_size, num_workers=0, update_fn=None, verbose=True, collate_fn=None):
         losses = []
-        for ood_detector in self.ood_detectors:
+        if verbose:
+            iter = tqdm.tqdm(self.ood_detectors)
+        else:
+            iter = self.ood_detectors
+        for ood_detector in iter:
             ood_detector.to(self.device)
-            loss = ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose, collate_fn)
+            loss = ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose=False, collate_fn=collate_fn)
             ood_detector.to("cpu")
             losses.append(loss)
         return losses
     
-    def predict(self, x, *args, reduce=True, **kwargs):
+    def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
         results = []
+        if verbose:
+            iter = tqdm.tqdm(self.ood_detectors)
+        else:
+            iter = iter
         for ood_detector in self.ood_detectors:
             ood_detector.to(self.device)
-            result = ood_detector.predict(x, *args, **kwargs)
+            result = ood_detector.predict(x, *args, verbose=False, **kwargs)
             ood_detector.to("cpu")
             results.append(result)
         if reduce:
