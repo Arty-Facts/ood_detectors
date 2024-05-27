@@ -197,8 +197,8 @@ class RDM():
         self.device = "cpu"
 
     def to(self, device):
-        self.ood_detector.to(self.device)
         self.device = device
+        self.ood_detector.to(self.device)
         return self
 
     def load_state_dict(self, state_dict):
