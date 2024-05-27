@@ -29,20 +29,26 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
             ax.axvline(mean_value, color=line_color, linestyle=':', linewidth=1.5)
     # Subplot 1: KDE plots
     if len(score.shape) > 1:
-        score = np.mean(score, axis=0)
-    sns.kdeplot(data=score, bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} training: {np.mean(score):.2f}')
-    add_shadow(axs[0, 0], score)
+        sns.kdeplot(data=np.mean(score, axis=0), bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} training: {np.mean(np.mean(score, axis=0)):.2f}')
+        add_shadow(axs[0, 0], np.mean(score, axis=0))
+    else:
+        sns.kdeplot(data=score, bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} training: {np.mean(score):.2f}')
+        add_shadow(axs[0, 0], score)
 
     if len(score_ref.shape) > 1:
-        score_ref = np.mean(score_ref, axis=0)
-    sns.kdeplot(data=score_ref, bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} validation: {np.mean(score_ref):.2f}')
-    add_shadow(axs[0, 0], score_ref)
+        sns.kdeplot(data=np.mean(score_ref, axis=0), bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} validation: {np.mean(np.mean(score_ref, axis=0)):.2f}')
+        add_shadow(axs[0, 0], np.mean(score_ref, axis=0))
+    else:
+        sns.kdeplot(data=score_ref, bw_adjust=.2, ax=axs[0, 0], label=f'{id_name} validation: {np.mean(score_ref):.2f}')
+        add_shadow(axs[0, 0], score_ref)
 
     for ood_name, score_ood in zip(ood_names, score_oods):
         if len(score_ood.shape) > 1:
-            score_ood = np.mean(score_ood, axis=0)
-        sns.kdeplot(data=score_ood, bw_adjust=.2, ax=axs[0, 0], label=f'{ood_name}: {np.mean(score_ood):.2f}')
-        add_shadow(axs[0, 0], score_ood)
+            sns.kdeplot(data=np.mean(score_ood, axis=0), bw_adjust=.2, ax=axs[0, 0], label=f'{ood_name}: {np.mean(np.mean(score_ood, axis=0)):.2f}')
+            add_shadow(axs[0, 0], np.mean(score_ood, axis=0))
+        else:
+            sns.kdeplot(data=score_ood, bw_adjust=.2, ax=axs[0, 0], label=f'{ood_name}: {np.mean(score_ood):.2f}')
+            add_shadow(axs[0, 0], score_ood)
     # axs[0, 0].xaxis.set_major_locator(ticker.MultipleLocator(base=0.5))
     # axs[0, 0].xaxis.set_minor_locator(ticker.MultipleLocator(base=0.1))
     axs[0, 0].set_title('Density Plots')
@@ -90,6 +96,7 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     #     axs[1, 1].set_title('Configuration')
     # axs[1, 1].axis('off')
      # Subplot 4: scatter plot of scores
+    print(score.shape)
     if score.ndim == 2:
         items, features = score.shape
         score1, score2 = np.mean(score[:items//2], axis=0), np.mean(score[items//2:], axis=0)
@@ -103,6 +110,9 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
             axs[1, 1].scatter(score_ood1, score_ood2, alpha=0.5, label=ood_name, s=1)
         axs[1, 1].set_xlabel(f'mean bits/dim for first {items//2} models')
         axs[1, 1].set_ylabel(f'mean bits/dim for last {items//2} models')
+        axs[1, 1].set_title('Scatter Plot of Scores')
+        axs[1, 1].legend()
+        
     else:
         axs[1, 1].axis('off')
 
