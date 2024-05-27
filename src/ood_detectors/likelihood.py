@@ -188,7 +188,7 @@ def RDM_VPSDE(feat_dim):
 
 
 class RDM():
-    def __init__(self, feat_dim, k=2, ood_model=None):
+    def __init__(self, feat_dim=None, k=2, ood_model=None):
         super().__init__()
         self.feat_dim = feat_dim
         self.k = k
