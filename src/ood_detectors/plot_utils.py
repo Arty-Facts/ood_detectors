@@ -96,7 +96,6 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     #     axs[1, 1].set_title('Configuration')
     # axs[1, 1].axis('off')
      # Subplot 4: scatter plot of scores
-    print(score.shape)
     if score.ndim == 2:
         items, features = score.shape
         score1, score2 = np.mean(score[:items//2], axis=0), np.mean(score[items//2:], axis=0)
