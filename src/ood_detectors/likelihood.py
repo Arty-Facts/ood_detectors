@@ -188,11 +188,14 @@ def RDM_VPSDE(feat_dim):
 
 
 class RDM():
-    def __init__(self, feat_dim, k=2):
+    def __init__(self, feat_dim, k=2, ood_model=None):
         super().__init__()
         self.feat_dim = feat_dim
         self.k = k
-        self.ood_detector = RDM_SubSDE(feat_dim)
+        if ood_model is None:
+            self.ood_detector = RDM_SubSDE(feat_dim)
+        else:
+            self.ood_detector = ood_model
         self.name = f"RDM_{self.ood_detector.name}x{k}"
         self.device = "cpu"
 
