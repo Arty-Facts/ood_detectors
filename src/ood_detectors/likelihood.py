@@ -192,46 +192,38 @@ class RDM():
         super().__init__()
         self.feat_dim = feat_dim
         self.k = k
-        self.ood_detectors = [
-            RDM_SubSDE(feat_dim) for _ in range(k)
-        ]
-        self.name = f"RDM_{self.ood_detectors[0].name}x{k}"
+        self.ood_detector = RDM_SubSDE(feat_dim)
+        self.name = f"RDM_{self.ood_detector.name}x{k}"
         self.device = "cpu"
 
     def to(self, device):
+        self.ood_detector.to(self.device)
         self.device = device
         return self
 
     def load_state_dict(self, state_dict):
-        for ood_detector, state_dict_ in zip(self.ood_detectors, state_dict):
-            ood_detector.load_state_dict(state_dict_)
+        self.ood_detector.load_state_dict(state_dict["ood_detector"])
+        self.k = state_dict["k"]
+        return self
 
     def state_dict(self):
-        return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
+        return {
+            "ood_detector": self.ood_detector.state_dict(), 
+            "k": self.k
+        }
     
     def fit(self, dataset, n_epochs, batch_size, num_workers=0, update_fn=None, verbose=True, collate_fn=None):
-        losses = []
-        if verbose:
-            iter = tqdm.tqdm(self.ood_detectors)
-        else:
-            iter = self.ood_detectors
-        for ood_detector in iter:
-            ood_detector.to(self.device)
-            loss = ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose=False, collate_fn=collate_fn)
-            ood_detector.to("cpu")
-            losses.append(loss)
-        return losses
+        loss = self.ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose, collate_fn)
+        return loss
     
     def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
         results = []
         if verbose:
-            iter = tqdm.tqdm(self.ood_detectors)
+            iter = tqdm.tqdm(range(self.k))
         else:
-            iter = iter
-        for ood_detector in self.ood_detectors:
-            ood_detector.to(self.device)
-            result = ood_detector.predict(x, *args, verbose=False, **kwargs)
-            ood_detector.to("cpu")
+            iter = range(self.k)
+        for _ in iter:
+            result = self.ood_detector.predict(x, *args, verbose=False, **kwargs)
             results.append(result)
         if reduce:
             return np.stack(results).mean(axis=0)

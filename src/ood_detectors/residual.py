@@ -72,7 +72,7 @@ class Residual:
         ).astype(np.float32)
         return [-1]
 
-    def predict(self, data, batch_size=32, *args, collate_fn=None, **kwargs):
+    def predict(self, data, batch_size=1024, *args, collate_fn=None, **kwargs):
         """
         Predict the outlier scores for the given data in batches.
 
@@ -95,14 +95,14 @@ class Residual:
         if isinstance(data, (list, tuple, np.ndarray)):
             data = torch.tensor(data, dtype=torch.float32)
             dataset = torch.utils.data.TensorDataset(data)
-            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
         elif isinstance(data, torch.Tensor):
             dataset = torch.utils.data.TensorDataset(data)
-            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+            data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
         elif isinstance(data, torch.utils.data.Dataset):
             if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
                 collate_fn = data.collate_fn
-            data_loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+            data_loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
         elif isinstance(data, torch.utils.data.DataLoader):
             data_loader = data
         else:
@@ -110,7 +110,6 @@ class Residual:
 
         scores = []
         for batch in data_loader:
-            batch = batch[0]  # TensorDataset returns a tuple
             batch_numpy = to_numpy(batch)
             batch_numpy = batch_numpy.astype(np.float32)
             batch_scores = np.linalg.norm((batch_numpy - self.u) @ self.ns, axis=-1)
@@ -159,10 +158,9 @@ class Residual:
 
 
 class ResidualX():
-    def __init__(self, k=2):
+    def __init__(self, dims=0.5, k=2):
         super().__init__()
-        linspaces = np.linspace(0.2, 0.5, k)
-        self.ood_detectors = [Residual(dims=linspace) for linspace in linspaces]
+        self.ood_detectors = [Residual(dims=dims) for _ in range(k)]
         self.name = f"Residualx{k}"
         self.device = "cpu"
 
@@ -179,11 +177,14 @@ class ResidualX():
         return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
     
     def fit(self, data, *args, verbose=True, **kwargs):
+        perm = np.random.permutation(len(data))
+        splits = np.array_split(perm, len(self.ood_detectors))
         if verbose:
-            iter = tqdm.tqdm(self.ood_detectors)
+            iter = tqdm.tqdm(zip(self.ood_detectors, splits))
         else:
-            iter = self.ood_detectors
-        return [ood_detector.fit(data, *args, **kwargs) for ood_detector in iter]
+            iter = zip(self.ood_detectors, splits)
+
+        return [ood_detector.fit(data[split], *args, **kwargs) for ood_detector, split in iter]
     
     def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
         if verbose:
