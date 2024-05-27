@@ -184,7 +184,23 @@ class ResidualX():
         else:
             iter = zip(self.ood_detectors, splits)
 
-        return [ood_detector.fit(data[split], *args, **kwargs) for ood_detector, split in iter]
+        loss = []
+        collate_fn = kwargs.get('collate_fn', None)
+        for ood_detector, split in iter:
+            if isinstance(data, (list, tuple)):
+                data_split = [data[i] for i in split]
+            elif isinstance(data, torch.Tensor):
+                data_split = data[split]
+            elif isinstance(data, torch.utils.data.Dataset):
+                if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
+                    collate_fn = data.collate_fn
+                    kwargs['collate_fn'] = collate_fn
+                data_split = torch.utils.data.Subset(data, split)
+            if isinstance(data, np.ndarray):
+                data_split = data[split]
+            loss.append(ood_detector.fit(data_split, *args, **kwargs))
+        return loss
+
     
     def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
         if verbose:
