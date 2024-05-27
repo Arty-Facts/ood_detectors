@@ -83,12 +83,28 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     else:
         axs[1, 0].axis('off')
 
-    # Subplot 4: Configuration display
-    if config is not None:
-        config_text = "\n".join([f"{key}: {value}" for key, value in config.items()])
-        axs[1, 1].text(0.5, 0.5, config_text, ha='center', va='center', fontsize=12, transform=axs[1, 1].transAxes)
-        axs[1, 1].set_title('Configuration')
-    axs[1, 1].axis('off')
+    # # Subplot 4: Configuration display
+    # if config is not None:
+    #     config_text = "\n".join([f"{key}: {value}" for key, value in config.items()])
+    #     axs[1, 1].text(0.5, 0.5, config_text, ha='center', va='center', fontsize=12, transform=axs[1, 1].transAxes)
+    #     axs[1, 1].set_title('Configuration')
+    # axs[1, 1].axis('off')
+     # Subplot 4: scatter plot of scores
+    if score.ndim == 2:
+        items, features = score.shape
+        score1, score2 = np.mean(score[:items//2], axis=0), np.mean(score[items//2:], axis=0)
+        axs[1, 1].scatter(score1, score2, alpha=0.5, label='ID Training', s=1)
+        
+        score_ref1, score_ref2 = np.mean(score_ref[:items//2], axis=0), np.mean(score_ref[items//2:], axis=0)
+        axs[1, 1].scatter(score_ref1, score_ref2, alpha=0.5, label='ID Validation', s=1)
+
+        for ood_name, score_ood in zip(ood_names, score_oods):
+            score_ood1, score_ood2 = np.mean(score_ood[:items//2], axis=0), np.mean(score_ood[items//2:], axis=0)
+            axs[1, 1].scatter(score_ood1, score_ood2, alpha=0.5, label=ood_name, s=1)
+        axs[1, 1].set_xlabel(f'mean bits/dim for first {items//2} models')
+        axs[1, 1].set_ylabel(f'mean bits/dim for last {items//2} models')
+    else:
+        axs[1, 1].axis('off')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust the layout
 
@@ -96,6 +112,7 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     out_dir = pathlib.Path(out_dir) / encoder / id_name
     out_dir.mkdir(exist_ok=True, parents=True)
     filename = f"{encoder}_{id_name}_{int(np.mean(disp_auc[1:])*100)}.svg"
+    (out_dir / filename).parent.mkdir(exist_ok=True, parents=True)
     plt.savefig(out_dir / filename, bbox_inches='tight')
     if verbose:
         plt.show()
