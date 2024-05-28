@@ -5,7 +5,7 @@ import numpy as np
 import pathlib
 
 
-def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=None, verbose=True, train_loss=None):
+def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=None, verbose=True, train_loss=None, ext="png"):
     if verbose:
         print('Generating plots...')
     # Unpack eval_data
@@ -120,7 +120,7 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     # Save the figure
     out_dir = pathlib.Path(out_dir) / encoder / id_name
     out_dir.mkdir(exist_ok=True, parents=True)
-    filename = f"{encoder}_{model}_{id_name}_{int(np.mean(disp_auc[1:])*100)}.svg"
+    filename = f"{encoder}_{model}_{id_name}_{int(np.mean(disp_auc[1:])*100)}.{ext}"
     (out_dir / filename).parent.mkdir(exist_ok=True, parents=True)
     plt.savefig(out_dir / filename, bbox_inches='tight')
     if verbose:
