@@ -14,7 +14,7 @@ def plot(eval_data, id_name, ood_names, encoder, model, out_dir='figs', config=N
     score_oods, auc_oods, fpr_oods = eval_data['score_oods'], eval_data['auc'], eval_data['fpr']
 
     # Create a figure with subplots
-    fig, axs = plt.subplots(2, 2, figsize=(15, 10))  # Adjust the size as needed
+    fig, axs = plt.subplots(2, 2, figsize=(15, 15))  # Adjust the size as needed
     fig.suptitle(f'{model} Evaluation on {encoder}')
 
     def add_shadow(ax, data): 
