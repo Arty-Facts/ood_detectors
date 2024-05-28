@@ -114,7 +114,6 @@ class Residual:
             batch_numpy = batch_numpy.astype(np.float32)
             batch_scores = np.linalg.norm((batch_numpy - self.u) @ self.ns, axis=-1)
             scores.append(batch_scores)
-
         return np.concatenate(scores)
 
     def __call__(self, *args, **kwargs):
@@ -180,7 +179,7 @@ class ResidualX():
         perm = np.random.permutation(len(data))
         splits = np.array_split(perm, len(self.ood_detectors))
         if verbose:
-            iter = tqdm.tqdm(zip(self.ood_detectors, splits))
+            iter = tqdm.tqdm(list(zip(self.ood_detectors, splits)))
         else:
             iter = zip(self.ood_detectors, splits)
 

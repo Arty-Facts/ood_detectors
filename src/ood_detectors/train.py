@@ -70,9 +70,9 @@ def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0,
         numpy.ndarray: An array of inference scores.
     """
     if collate_fn is None:
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     else:
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=collate_fn)
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn)
     all_bpds = 0.
     all_items = 0
     score_id = []
