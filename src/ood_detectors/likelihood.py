@@ -119,7 +119,7 @@ class Likelihood:
 
         return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
 
-    def predict(self, dataset, batch_size, num_workers=0, verbose=True, collate_fn=None):
+    def predict(self, dataset, batch_size, num_workers=0, verbose=True, collate_fn=None, reduce=False):
         """Performs inference on the given dataset.
 
         Args:
