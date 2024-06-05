@@ -19,7 +19,7 @@ transformers[torch]
 seaborn
 einops
 torchdiffeq 
-git+https://github.com/openai/CLIP.git
 timm
 openmim
 gdown
+faiss-cpu
