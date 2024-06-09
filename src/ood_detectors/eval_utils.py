@@ -74,6 +74,7 @@ def eval_ood(
     num_workers=0,
     recall=0.95,
     verbose=True,
+    **kwargs,
 ):
     """
     Evaluate the out-of-distribution (OOD) detection performance of a model.
@@ -93,11 +94,11 @@ def eval_ood(
     """
     if verbose:
         print("Running eval. In-distribution data")
-    score_id = model.predict(dataset, batch_size, num_workers, verbose=verbose, reduce=False)
+    score_id = model.predict(dataset, batch_size, num_workers, verbose=verbose, reduce=False, **kwargs)
     if verbose:
         print("Running eval. Reference data")
     score_ref = model.predict(
-        reference_dataset, batch_size, num_workers, verbose=verbose, reduce=False
+        reference_dataset, batch_size, num_workers, verbose=verbose, reduce=False, **kwargs
     )
     if score_ref.ndim > 1:
         ref_auc = auc(-np.mean(score_ref, axis=0), -np.mean(score_id, axis=0))
@@ -113,7 +114,7 @@ def eval_ood(
     for i, ood_dataset in enumerate(ood_datasets):
         if verbose:
             print(f"Running eval. Out-of-distribution data {i+1}/{len(ood_datasets)}")
-        score_ood = model.predict(ood_dataset, batch_size, num_workers, verbose=verbose, reduce=False)
+        score_ood = model.predict(ood_dataset, batch_size, num_workers, verbose=verbose, reduce=False, **kwargs)
         score_oods.append(score_ood)
         if score_ood.ndim > 1:
             auc_ood = auc(-np.mean(score_ref, axis=0), -np.mean(score_ood, axis=0))
