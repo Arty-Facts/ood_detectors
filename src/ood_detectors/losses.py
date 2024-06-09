@@ -298,3 +298,96 @@ class SDE_BF16:
         self.scaler.step(self.optimizer)
         self.scaler.update()
         return loss
+class SDE_F16:
+    def __init__(
+        self,
+        sde,
+        model,
+        optimizer,
+        reduce_mean=True,
+        continuous=True,
+        likelihood_weighting=False,
+    ):
+        """Create a one-step training/evaluation class.
+        """
+        if continuous:
+            self.loss_fn = get_sde_loss_fn(
+                sde,
+                reduce_mean=reduce_mean,
+                continuous=True,
+                likelihood_weighting=likelihood_weighting,
+            )
+        else:
+            assert (
+                not likelihood_weighting
+            ), "Likelihood weighting is not supported for original SMLD/DDPM training."
+            if isinstance(sde, sde_lib.VESDE):
+                self.loss_fn = get_smld_loss_fn(sde, reduce_mean=reduce_mean)
+            elif isinstance(sde, sde_lib.VPSDE):
+                self.loss_fn = get_ddpm_loss_fn(sde, reduce_mean=reduce_mean)
+            else:
+                raise ValueError(
+                    f"Discrete training for {sde.__class__.__name__} is not recommended."
+                )
+
+        self.optimizer = optimizer
+        self.scaler = torch.cuda.amp.GradScaler()
+      
+    def __call__(self, model, x, *args, **kwargs):
+        """Running one step of training or evaluation.
+        Returns:
+        loss: The average loss value of this state.
+        """
+
+        self.optimizer.zero_grad()
+        with torch.cuda.amp.autocast(dtype=torch.float16):
+            loss = self.loss_fn(model, x)
+        self.scaler.scale(loss).backward()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
+        return loss
+class SDE_F32:
+    def __init__(
+        self,
+        sde,
+        model,
+        optimizer,
+        reduce_mean=True,
+        continuous=True,
+        likelihood_weighting=False,
+    ):
+        """Create a one-step training/evaluation class.
+        """
+        if continuous:
+            self.loss_fn = get_sde_loss_fn(
+                sde,
+                reduce_mean=reduce_mean,
+                continuous=True,
+                likelihood_weighting=likelihood_weighting,
+            )
+        else:
+            assert (
+                not likelihood_weighting
+            ), "Likelihood weighting is not supported for original SMLD/DDPM training."
+            if isinstance(sde, sde_lib.VESDE):
+                self.loss_fn = get_smld_loss_fn(sde, reduce_mean=reduce_mean)
+            elif isinstance(sde, sde_lib.VPSDE):
+                self.loss_fn = get_ddpm_loss_fn(sde, reduce_mean=reduce_mean)
+            else:
+                raise ValueError(
+                    f"Discrete training for {sde.__class__.__name__} is not recommended."
+                )
+
+        self.optimizer = optimizer
+      
+    def __call__(self, model, x, *args, **kwargs):
+        """Running one step of training or evaluation.
+        Returns:
+        loss: The average loss value of this state.
+        """
+
+        self.optimizer.zero_grad()
+        loss = self.loss_fn(model, x)
+        loss.backward()
+        self.optimizer.step()
+        return loss

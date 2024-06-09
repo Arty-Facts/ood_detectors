@@ -106,7 +106,7 @@ class Likelihood:
 
         """
         if update_fn is None:
-            update_fn = losses.SDE_BF16(
+            update_fn = losses.SDE_F32(
                 sde=self.sde,
                 model=self.model,
                 optimizer=self.optimizer,
