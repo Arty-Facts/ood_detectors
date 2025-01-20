@@ -50,6 +50,7 @@ class Likelihood:
             self.model = SimpleMLP(feat_dim)
         self.sde = sde
         self.optimizer = optimizer(self.model.parameters())
+        self.lr = self.optimizer.param_groups[0]['lr']
         self.device = "cpu"
         self.name = f"{self.sde.__class__.__name__}_{self.model.__class__.__name__}"
 
@@ -90,6 +91,7 @@ class Likelihood:
             update_fn=None, 
             verbose=True,
             collate_fn=None,
+            use_lrs=True,
             ):
         """Trains the model on the given dataset.
 
@@ -116,8 +118,12 @@ class Likelihood:
         
         if collate_fn is None and getattr(dataset, 'collate_fn', None) is not None:
             collate_fn = dataset.collate_fn
+            
+        lrs = None
+        if use_lrs:
+            lrs = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, max_lr=self.lr, total_steps=n_epochs)
 
-        return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn)
+        return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn, lrs=lrs)
 
     def predict(self, dataset, batch_size, num_workers=0, verbose=True, collate_fn=None, reduce=False):
         """Performs inference on the given dataset.

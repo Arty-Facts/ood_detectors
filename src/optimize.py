@@ -17,17 +17,19 @@ def select_trial(trial,method):
     conf = {}
     if method == 'Residual':
         conf['dims'] = trial.suggest_float('Residual.dims', 0, 1)
+    elif method == 'KNN':
+        conf['k'] = trial.suggest_int('KNN.k', 1, 10)
     else:
-        conf['n_epochs'] = trial.suggest_int('n_epochs', 100, 500, step=100)
-        conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 256, 2048, step = 256)
+        conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
+        conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 2048, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 3, 15)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
         conf['dropout'] = trial.suggest_float('dropout', 0.0, 0.5)
         conf['lr'] = trial.suggest_float('lr', 1e-6, 1e-2, log=True)
         # conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
         # conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
-        # conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
-        # conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
+        conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
+        conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
         if method != 'subVPSDE':
             conf['continuous'] = trial.suggest_categorical('continuous', [True, False])
         else:
@@ -93,12 +95,12 @@ def objective(trial, data, encoders, datasets, method, device, verbose=True):
     id = sum(ids) / len(ids)
     farood = sum(faroods) / len(faroods)
     nearood = sum(nearoods) / len(nearoods)
-    return abs(id-0.5), farood, nearood
+    return nearood, farood, abs(id-0.5)
 
 def ask_tell_optuna(objective_func, data, encoders, datasets, method, device):
     study_name = f'{method}'
-    db = f'sqlite:///optuna_v2.db'
-    study = optuna.create_study(directions=['minimize', 'maximize', 'maximize'], study_name=study_name, storage=db, load_if_exists=True)
+    db = f'sqlite:///optuna_v3.db'
+    study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
     res = objective_func(trial, data, encoders, datasets, method, device)
     study.tell(trial, res)
@@ -118,13 +120,13 @@ def main():
             tmp = tmp[p]
         else:
             tmp[parts[-2]] = path
-    # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip']
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit']
+    # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'bit']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'bit']
     #['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
     # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
-    methods = ['VESDE', 'VPSDE',]
+    methods = ['subVPSDE', 'Residual', 'KNN']
     jobs = []
     for m in methods:
         jobs.append((objective, features_data, encoders, datasets, m))

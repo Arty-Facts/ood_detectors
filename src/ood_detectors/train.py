@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import tqdm
 
-def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, collate_fn=None):
+def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0, verbose=True, tw=None, collate_fn=None, lrs=None):
     """
     Trains a model on a given dataset for a specified number of epochs.
 
@@ -34,7 +34,7 @@ def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0
     avg_epoch_loss = []
     model.train()
     for epoch in epochs:
-        avg_loss = 0.
+        avg_loss = 0
         num_items = 0
         epoch_loss = []
         for x in data_loader:
@@ -45,6 +45,8 @@ def train(dataset, model, update_fn, n_epochs, batch_size, device, num_workers=0
             epoch_loss.append(loss.item())
         epoch_loss = np.mean(epoch_loss)
         avg_epoch_loss.append(epoch_loss)
+        if lrs is not None:
+            lrs.step()
         if tw is not None:
             tw.add_scalar('Loss/train', epoch_loss, epoch)
         # Print the averaged training loss so far.

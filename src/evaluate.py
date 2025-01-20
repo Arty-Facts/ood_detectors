@@ -80,6 +80,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
                         eps=eps,
                         weight_decay=weight_decay,
                         )
+        
 
         ood_model = likelihood.Likelihood(
             sde = sde,
@@ -237,7 +238,7 @@ def objective(method, encoder, dataset, method_configs, checkpoints, device):
     with open(f"results/{method}_{encoder}_{dataset}.yaml", "w") as f:
         yaml.dump(results, f, sort_keys=False)
 
-def main(checkpoint = "results_v3"):
+def main(checkpoint = "results_v6"):
 
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet_sub', 'imagenet', 'imagenet200', 'cifar10', 'cifar100']

@@ -13,42 +13,6 @@ def download(url, filename):
     with open(filename, 'wb') as f:
         f.write(data.content)
 
-def load_model(obj, builder, model_dir_path, weights):
-    model_dir_path = pathlib.Path(model_dir_path)
-    model_dir_path.mkdir(exist_ok=True, parents=True)
-    if weights not in obj.WEIGTHS:
-        raise ValueError(f"weights should be one of {obj.WEIGTHS.keys()}")
-    model = builder(weights=obj.WEIGTHS[weights])
-    return model
-
-TRANSFORM_IMAGENET1K_V1 = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((224, 224)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-])
-
-TRANSFORM_IMAGENET1K_SWAG_E2E_V1_384 = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((384, 384)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-])
-TRANSFORM_IMAGENET1K_SWAG_E2E_V1_512 = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((512, 512)),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
-])
-
-TRANSFORMS = {
-    "ViT_B_16_IMAGENET1K_V1": TRANSFORM_IMAGENET1K_V1,
-    "ViT_B_16_IMAGENET1K_SWAG_E2E_V1": TRANSFORM_IMAGENET1K_SWAG_E2E_V1_384,
-    "ViT_B_16_IMAGENET1K_SWAG_LINEAR_V1": TRANSFORM_IMAGENET1K_V1,
-    "ViT_B_32_IMAGENET1K_V1": TRANSFORM_IMAGENET1K_V1,
-    "ViT_L_16_IMAGENET1K_V1": TRANSFORM_IMAGENET1K_V1,
-    "ViT_L_16_IMAGENET1K_SWAG_E2E_V1": TRANSFORM_IMAGENET1K_SWAG_E2E_V1_512,
-    "ViT_L_16_IMAGENET1K_SWAG_LINEAR_V1": TRANSFORM_IMAGENET1K_V1,
-    "ViT_L_32_IMAGENET1K_V1": TRANSFORM_IMAGENET1K_V1,
-}
-
 class TimmModel(torch.nn.Module):
     def __init__(self, model_name: str):
         super().__init__()
@@ -56,6 +20,7 @@ class TimmModel(torch.nn.Module):
         self.model = timm.create_model(model_name, pretrained=True, num_classes=0)
         data_config = timm.data.resolve_model_data_config(self.model)   
         self.transform = timm.data.create_transform(**data_config, is_training=True, no_aug=True)
+        self.train_transform = timm.data.create_transform(**data_config, is_training=True, no_aug=False)
 
 
     def forward(self, x):
@@ -67,94 +32,6 @@ class TimmModel(torch.nn.Module):
         return x
 
 
-
-class BASE_ViT(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.transform = TRANSFORMS[self.name]
-
-    def forward(self, x):
-        x = self.model(x)
-        return x
-    
-    def features(self, x):
-        x = self.model._process_input(x)
-        n = x.shape[0]
-
-        # Expand the class token to the full batch
-        batch_class_token = self.model.class_token.expand(n, -1, -1)
-        x = torch.cat([batch_class_token, x], dim=1)
-
-        x = self.model.encoder(x)
-
-        # Classifier "token" as used by standard language architectures
-        x = x[:, 0]
-        return x
-
-class ViT_B_16(BASE_ViT):
-    WEIGTHS = {
-        "IMAGENET1K_V1": torchvision.models.ViT_B_16_Weights.IMAGENET1K_V1,
-        "IMAGENET1K_SWAG_E2E_V1": torchvision.models.ViT_B_16_Weights.IMAGENET1K_SWAG_E2E_V1,
-        "IMAGENET1K_SWAG_LINEAR_V1": torchvision.models.ViT_B_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
-    }
-    def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'ViT_B_16_{weights}'
-        super().__init__()
-        self.model = load_model(self, torchvision.models.vit_b_16, model_dir_path, weights)
-        self.name = f'vit_b_16'
-
-
-    def features(self, x):
-        # Reshape and permute the input tensor
-        x = self.model._process_input(x)
-        n = x.shape[0]
-
-        # Expand the class token to the full batch
-        batch_class_token = self.model.class_token.expand(n, -1, -1)
-        x = torch.cat([batch_class_token, x], dim=1)
-
-        x = self.model.encoder(x)
-
-        # Classifier "token" as used by standard language architectures
-        x = x[:, 0]
-        return x
-
- 
-class ViT_B_32(BASE_ViT):
-    WEIGTHS = {
-        "IMAGENET1K_V1": torchvision.models.ViT_B_32_Weights.IMAGENET1K_V1,
-    }
-    def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'ViT_B_32_{weights}'
-        super().__init__()
-        self.model = load_model(self, torchvision.models.vit_b_32, model_dir_path, weights)
-        self.name = f'vit_b_32'
-
-  
-
-class ViT_L_16(BASE_ViT):
-    WEIGTHS = {
-        "IMAGENET1K_V1": torchvision.models.ViT_L_16_Weights.IMAGENET1K_V1,
-        "IMAGENET1K_SWAG_E2E_V1": torchvision.models.ViT_L_16_Weights.IMAGENET1K_SWAG_E2E_V1,
-        "IMAGENET1K_SWAG_LINEAR_V1": torchvision.models.ViT_L_16_Weights.IMAGENET1K_SWAG_LINEAR_V1,
-    }
-    def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        self.name = f'ViT_L_16_{weights}'
-        super().__init__()
-        self.model = load_model(self, torchvision.models.vit_l_16, model_dir_path, weights)
-        self.name = f'vit_l_16'
-
-   
-
-class VIT_L_32(BASE_ViT):
-    WEIGTHS = {
-        "IMAGENET1K_V1": torchvision.models.ViT_L_32_Weights.IMAGENET1K_V1,
-    }
-    def __init__(self, model_dir_path='checkpoints', weights='IMAGENET1K_V1'):
-        super().__init__()
-        self.name = f'ViT_L_32_{weights}'
-        self.model = load_model(self, torchvision.models.vit_l_32, model_dir_path, weights)
-        self.name = f'vit_l_32'
 
 class Dino_ViT_B_16(torch.nn.Module):
     def __init__(self):
@@ -164,6 +41,13 @@ class Dino_ViT_B_16(torch.nn.Module):
         
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((224, 224)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+
+        self.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
@@ -184,6 +68,13 @@ class DinoV2_ViT_B_14(torch.nn.Module):
         
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((224, 224)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+
+        self.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
@@ -211,6 +102,13 @@ class ViT_P16_21k(torch.nn.Module):
             download(url, weights)
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((384, 384)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ])
+
+        self.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(384),
+            torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
@@ -262,6 +160,7 @@ class ClipVisionModel(torch.nn.Module):
         super().__init__()
         self.name = 'CLIP'
         self.model, self.transform = clip.load("ViT-B/32", device='cpu')
+        self.train_transform = self.transform
         self.device = 'cpu'
 
     def to(self, device):
@@ -417,6 +316,13 @@ class Swin_T(nn.Module):
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
+        self.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+
     def features(self, x):
         x = self.model.features(x)
         x = self.model.norm(x)
@@ -507,7 +413,7 @@ data_list_open_ood = [
     'bimcv',
 ]
 
-AVAILABLE_ENCODERS = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'vit_b16', 'clip', 'swin_t', 'resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
+AVAILABLE_ENCODERS = ['repvgg', 'resnet50d', 'swin', 'bit', 'deit', 'dino', 'dinov2', 'vit', 'clip', 'swin_t', 'resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
 
 def download_and_extract(hash, checkpoint_path):
     gdown.download(id=hash, output=str(checkpoint_path / f"{hash}.zip") )
@@ -526,14 +432,14 @@ def get_encoder(name):
         return TimmModel('swin_base_patch4_window7_224')
     elif name in ['deit', 'deit_base_patch16_224']:
         return TimmModel('deit_base_patch16_224')
+    elif name in ['bit', 'resnetv2_101x1_bit.goog_in21k_ft_in1k']:
+        return TimmModel('resnetv2_101x1_bit.goog_in21k_ft_in1k')
     elif name in ['dino', 'dino_vit_b_16']:
         return Dino_ViT_B_16()
     elif name in ['dinov2', 'dinov2_vit_b_14']:
         return DinoV2_ViT_B_14()
     elif name in ['vit','vit_p16']:
         return ViT_P16_21k()
-    elif name in ['vit_b16']:
-        return ViT_B_16()
     elif name in ['swin_t']:
         return Swin_T()
     elif name in ['clip']:
@@ -551,6 +457,13 @@ def get_encoder(name):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['cifar10'])
         ])
+
+        model.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(32),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(*normalization_dict['cifar10'])
+        ])
         model.name = 'resnet18_32x32_cifar10_open_ood'
         return model
     elif name in ['resnet18_32x32_cifar100_open_ood']:
@@ -563,6 +476,13 @@ def get_encoder(name):
         model.load_state_dict(torch.load(model_path))
         model.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize((32, 32)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(*normalization_dict['cifar100'])
+        ])
+
+        model.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(32),
+            torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['cifar100'])
         ])
@@ -582,6 +502,14 @@ def get_encoder(name):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['imagenet'])
         ])
+
+        model.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(*normalization_dict['imagenet'])
+        ])
+
         model.name = 'resnet18_224x224_imagenet200_open_ood'
         return model
     elif name in ['resnet50_224x224_imagenet_open_ood']:
@@ -598,6 +526,14 @@ def get_encoder(name):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['imagenet'])
         ])
+
+        model.train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(*normalization_dict['imagenet'])
+        ])
+
         model.name = 'resnet50_224x224_imagenet_open_ood'
         return model
     else:
@@ -619,13 +555,13 @@ def build_dataset(data_root, transform, img_list=None):
         dataset = ImageFolder(data_root, transform, allow_empty=True)
     return dataset
 
-def imagenet_ood_datasets(data_root, transforms, image_list_root):
+def imagenet_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet/train_imagenet.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/imagenet/train_imagenet.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet/val_imagenet.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet/test_imagenet.txt')
     datasets['nearood']['ssb_hard'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet/test_ssb_hard.txt')
@@ -640,13 +576,13 @@ def imagenet_ood_datasets(data_root, transforms, image_list_root):
     return datasets
     
 
-def imagenet200_ood_datasets(data_root, transforms, image_list_root):
+def imagenet200_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet200/train_imagenet200.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/imagenet200/train_imagenet200.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet200/val_imagenet200.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet200/test_imagenet200.txt')
     datasets['nearood']['ssb_hard'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/imagenet/test_ssb_hard.txt')
@@ -661,13 +597,13 @@ def imagenet200_ood_datasets(data_root, transforms, image_list_root):
     return datasets
 
 
-def cifar10_ood_datasets(data_root, transforms, image_list_root):
+def cifar10_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar10/train_cifar10.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/cifar10/train_cifar10.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar10/val_cifar10.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar10/test_cifar10.txt')
     datasets['nearood']['cifar100'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar10/test_cifar100.txt')
@@ -679,13 +615,13 @@ def cifar10_ood_datasets(data_root, transforms, image_list_root):
     datasets['csid']['cinic10'] = build_dataset(f"{data_root}/cinic10/val", transforms, img_list="all")
     return datasets
 
-def cifar100_ood_datasets(data_root, transforms, image_list_root):
+def cifar100_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar100/train_cifar100.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/cifar100/train_cifar100.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar100/val_cifar100.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar100/test_cifar100.txt')
     datasets['nearood']['cifar10'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/cifar100/test_cifar10.txt')
@@ -697,13 +633,13 @@ def cifar100_ood_datasets(data_root, transforms, image_list_root):
     datasets['csid']['cifar100c'] = build_dataset(f"{data_root}/cifar100c/", transforms, img_list="all")
     return datasets
 
-def covid_ood_datasets(data_root, transforms, image_list_root):
+def covid_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/covid/train_bimcv.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/covid/train_bimcv.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/covid/val_bimcv.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/covid/test_bimcv.txt')
     datasets['nearood']['ct'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/covid/test_ct.txt')
@@ -716,13 +652,13 @@ def covid_ood_datasets(data_root, transforms, image_list_root):
     datasets['csid']['hannover'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/covid/test_hannover.txt')
     return datasets
 
-def mnist_ood_datasets(data_root, transforms, image_list_root):
+def mnist_ood_datasets(data_root, transforms, train_transform, image_list_root):
     datasets = {}
     datasets['id'] = {}
     datasets['nearood'] = {}
     datasets['farood'] = {}
     datasets['csid'] = {}
-    datasets['id']['train'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/mnist/train_mnist.txt')
+    datasets['id']['train'] = build_dataset(data_root, train_transform, img_list=f'{image_list_root}/mnist/train_mnist.txt')
     datasets['id']['val'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/mnist/val_mnist.txt')
     datasets['id']['test'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/mnist/test_mnist.txt')
     datasets['nearood']['notmnist'] = build_dataset(data_root, transforms, img_list=f'{image_list_root}/mnist/test_notmnist.txt')
@@ -736,19 +672,21 @@ def mnist_ood_datasets(data_root, transforms, image_list_root):
 
 AVAILABLE_DATASETS = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
 
-def get_datasets(name, data_root, image_list_root, transform):
+def get_datasets(name, data_root, image_list_root, transform, train_transform=None):
+    if train_transform is not None:
+        train_transform = transform
     if name == 'imagenet':
-        return imagenet_ood_datasets(data_root, transform, image_list_root)
+        return imagenet_ood_datasets(data_root, transform, train_transform, image_list_root)
     elif name == 'imagenet200':
-        return imagenet200_ood_datasets(data_root, transform, image_list_root)
+        return imagenet200_ood_datasets(data_root, transform, train_transform, image_list_root)
     elif name == 'cifar10':
-        return cifar10_ood_datasets(data_root, transform, image_list_root)
+        return cifar10_ood_datasets(data_root, transform, train_transform, image_list_root)
     elif name == 'cifar100':
-        return cifar100_ood_datasets(data_root, transform, image_list_root)
+        return cifar100_ood_datasets(data_root, transform, train_transform, image_list_root)
     elif name == 'covid':
-        return covid_ood_datasets(data_root, transform, image_list_root)
+        return covid_ood_datasets(data_root, transform, train_transform, image_list_root)
     elif name == 'mnist':
-        return mnist_ood_datasets(data_root, transform, image_list_root)
+        return mnist_ood_datasets(data_root, transform, train_transform, image_list_root)
     else:
         raise ValueError(f"Dataset {name} not available. Available datasets: {AVAILABLE_DATASETS}")
     
