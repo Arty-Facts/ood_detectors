@@ -49,7 +49,7 @@ system_dep:
   - wget
   - unzip
   - libegl1
-  - libgl1-mesa-glx
+  - libglx-mesa0
 python_dep:
   file: ./requirements_dev.txt
 notebook_token: ood
