@@ -54,7 +54,7 @@ def select_trial(trial,method):
     return conf
 
 
-def objective(trial, data, encoders, datasets, method, device, verbose=True):
+def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, verbose=True):
     conf = select_trial(trial, method)
     ids = []
     faroods = []
@@ -67,7 +67,7 @@ def objective(trial, data, encoders, datasets, method, device, verbose=True):
         for dataset in datasets:
             if verbose:
                 bar.set_description(f'Method: {method}, Encoder: {encoder}, Dataset: {dataset}')
-            results = run(conf, data, encoder, dataset, method, device)
+            results = run(conf, data, encoder, dataset, method, device, checkpoints=checkpoints_dir)
             auc = results['id']["AUC"]
             fpr = results['id']["FPR_95"]
             loss = results['id']['loss']
@@ -98,12 +98,12 @@ def objective(trial, data, encoders, datasets, method, device, verbose=True):
     nearood = sum(nearoods) / len(nearoods)
     return nearood, farood, abs(id-0.5)
 
-def ask_tell_optuna(objective_func, data, encoders, datasets, method, device):
+def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoints_dir, device):
     study_name = f'{method}'
     db = f'sqlite:///optuna_v3.db'
     study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
-    res = objective_func(trial, data, encoders, datasets, method, device)
+    res = objective_func(trial, data, encoders, datasets, method, checkpoints_dir, device)
     study.tell(trial, res)
         
 
@@ -111,6 +111,7 @@ def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     device_info = di.Device()
     features = pathlib.Path("/mnt/data/arty/data/features_ood_2025")
+    checkpoints_dir = "/mnt/data/arty/data/checkpoints/ood_2025"
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
@@ -131,7 +132,7 @@ def main():
     methods = ['subVPSDE', 'Residual', 'KNN']
     jobs = []
     for m in methods:
-        jobs.append((objective, features_data, encoders, datasets, m))
+        jobs.append((objective, features_data, encoders, datasets, m, checkpoints_dir))
        
     trials = 100
     gpu_nodes = []
