@@ -18,7 +18,7 @@ tqdm
 transformers[torch]
 seaborn
 einops
-torchdiffeq 
+torchdiffeq
 timm
 openmim
 gdown
