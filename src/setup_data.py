@@ -58,7 +58,7 @@ def main():
     # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', , 'swin_t']
     encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'bit', 'dino', 'dinov2', 'vit', 'swin_t']
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100']
-    datasets = ['imagenet200', 'imagenet']
+    datasets = ['imagenet']
     gpu_nodes = [0, 1, 2, 3]
     aug = True
 
