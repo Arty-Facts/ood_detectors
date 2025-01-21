@@ -156,7 +156,7 @@ class SDE_EMA_Warmup_GradClip:
         self.warmup = warmup
         self.grad_clip = grad_clip
         self.lr = optimizer.param_groups[0]["lr"]
-        # self.scaler = torch.cuda.amp.GradScaler()
+        # self.scaler = torch.amp.GradScaler()
 
     def __call__(self, model, x, train=True):
         """Running one step of training or evaluation.
@@ -225,7 +225,7 @@ class SDE_LRS_BF16:
 
         self.optimizer = optimizer
         self.lr = optimizer.param_groups[0]["lr"]
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.amp.GradScaler()
         self.total_steps = total_steps
         self.lrs = torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer,
@@ -240,7 +240,7 @@ class SDE_LRS_BF16:
         """
 
         self.optimizer.zero_grad()
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(dtype=torch.bfloat16):
             loss = self.loss_fn(model, x)
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
@@ -283,7 +283,7 @@ class SDE_BF16:
                 )
 
         self.optimizer = optimizer
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.amp.GradScaler()
       
     def __call__(self, model, x, *args, **kwargs):
         """Running one step of training or evaluation.
@@ -292,7 +292,7 @@ class SDE_BF16:
         """
 
         self.optimizer.zero_grad()
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+        with torch.amp.autocast(dtype=torch.bfloat16):
             loss = self.loss_fn(model, x)
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
@@ -331,7 +331,7 @@ class SDE_F16:
                 )
 
         self.optimizer = optimizer
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.scaler = torch.amp.GradScaler()
       
     def __call__(self, model, x, *args, **kwargs):
         """Running one step of training or evaluation.
@@ -340,7 +340,7 @@ class SDE_F16:
         """
 
         self.optimizer.zero_grad()
-        with torch.cuda.amp.autocast(dtype=torch.float16):
+        with torch.amp.autocast(dtype=torch.float16):
             loss = self.loss_fn(model, x)
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
