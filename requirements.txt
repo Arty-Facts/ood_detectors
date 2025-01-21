@@ -16,3 +16,4 @@ openmim
 gdown
 faiss-cpu
 nvidia-ml-py3
+pynvml
