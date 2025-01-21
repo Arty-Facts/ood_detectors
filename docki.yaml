@@ -48,7 +48,8 @@ system_dep:
   - python3-venv
   - wget
   - unzip
-  - libgl1-mesa-glx 
+  - libegl1
+  - libgl1-mesa-glx
 python_dep:
   file: ./requirements_dev.txt
 notebook_token: ood
