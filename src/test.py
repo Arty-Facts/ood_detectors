@@ -1,22 +1,44 @@
-from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetName, nvmlDeviceGetMemoryInfo, nvmlDeviceGetUtilizationRates
+from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetName, nvmlDeviceGetMemoryInfo, nvmlDeviceGetUtilizationRates, nvmlShutdown
 import time
-def get_nvml_info():
-    try:
+
+class Memory():
+    def __init__(self, total, free, used):
+        self.total = total
+        self.free = free
+        self.used = used
+
+    def __repr__(self):
+        return f"Memory(total={self.total:.2f}GB, free={self.free:.2f}GB, used={self.used:.2f}GB)" 
+
+class Util():
+    def __init__(self, gpu, memory):
+        self.gpu = gpu
+        self.memory = memory
+        
+    def __repr__(self):
+        return f"Util(gpu={self.gpu:.2f}%, memory={self.memory:.2f}%)"
+
+class GPU():
+    def __init__(self, name, mem_info, util_info):
+        self.name = name
+        self.mem_info = mem_info
+        self.util_info = util_info
+
+    def __repr__(self):
+        return f"GPU(name={self.name}, mem_info={self.mem_info}, util_info={self.util_info})"
+
+class Device():
+    def __init__(self):
         nvmlInit()
-        device_count = nvmlDeviceGetCount()
-        print(f"Found {device_count} GPU(s):")
-        for i in range(device_count):
+        self.device_count = nvmlDeviceGetCount()
+
+        self.gpu_info = []
+
+        for i in range(self.device_count):
             handle = nvmlDeviceGetHandleByIndex(i)
             name = nvmlDeviceGetName(handle)
             memory = nvmlDeviceGetMemoryInfo(handle)
-            print(f"GPU {i}: {name}")
-            # in
-            print(f"  Total Memory: {memory.total * 1e-9:.2f} GB")
-            print(f"  Free Memory: {memory.free * 1e-9:.2f} GB")
-            print(f"  Used Memory: {memory.used * 1e-9:.2f} GB")
 
-
-            # utilization 
             gpu_util = 0.0
             mem_util = 0.0
             for i in range(10):
@@ -27,10 +49,25 @@ def get_nvml_info():
             gpu_util /= 10
             mem_util /= 10
 
-            print(f"  GPU Utilization: {gpu_util}%")
-            print(f"  Memory Utilization: {mem_util}%")
+            self.gpu_info.append(GPU(
+                name, 
+                Memory(memory.total*1e-9, memory.free*1e-9, memory.used*1e-9),
+                Util(gpu_util, mem_util))
+            )
+        
+        nvmlShutdown()
 
-    except Exception as e:
-        print("Error accessing NVML:", e)
-
-get_nvml_info()
+    def __len__(self):
+        return self.device_count
+    
+    def __getitem__(self, i):
+        return self.gpu_info[i]
+    
+    def __repr__(self):
+        return f"Device({self.gpu_info})"
+    
+if __name__ == "__main__":
+    device = Device()
+    print(device)
+    print(len(device))
+    print(device[0])
