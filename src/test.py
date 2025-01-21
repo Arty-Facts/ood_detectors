@@ -10,9 +10,16 @@ def get_nvml_info():
             name = nvmlDeviceGetName(handle)
             memory = nvmlDeviceGetMemoryInfo(handle)
             print(f"GPU {i}: {name}")
-            print(f"  Total Memory: {memory.total / 1024**2:.2f} MB")
-            print(f"  Used Memory: {memory.used / 1024**2:.2f} MB")
-            print(f"  Free Memory: {memory.free / 1024**2:.2f} MB")
+            # in
+            print(f"  Total Memory: {memory.total / 1e-9:.2f} GB")
+            print(f"  Free Memory: {memory.free / 1e-9:.2f} GB")
+            print(f"  Used Memory: {memory.used / 1e-9:.2f} GB")
+
+
+            # utilization 
+            print(f"  GPU Utilization: {nvmlDeviceGetUtilizationRates(handle).gpu} %")
+            print(f"  Memory Utilization: {nvmlDeviceGetUtilizationRates(handle).memory} %") 
+            
     except Exception as e:
         print("Error accessing NVML:", e)
 
