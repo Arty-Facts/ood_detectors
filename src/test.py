@@ -1,5 +1,5 @@
 from pynvml import nvmlInit, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetName, nvmlDeviceGetMemoryInfo, nvmlDeviceGetUtilizationRates
-
+import time
 def get_nvml_info():
     try:
         nvmlInit()
@@ -17,8 +17,18 @@ def get_nvml_info():
 
 
             # utilization 
-            print(f"  GPU Utilization: {nvmlDeviceGetUtilizationRates(handle).gpu} %")
-            print(f"  Memory Utilization: {nvmlDeviceGetUtilizationRates(handle).memory} %") 
+            gpu_util = 0.0
+            mem_util = 0.0
+            for i in range(10):
+                gpu_util += nvmlDeviceGetUtilizationRates(handle).gpu
+                mem_util += nvmlDeviceGetUtilizationRates(handle).memory
+                time.sleep(0.1)
+
+            gpu_util /= 10
+            mem_util /= 10
+
+            print(f"  GPU Utilization: {gpu_util}%")
+            print(f"  Memory Utilization: {mem_util}%")
 
     except Exception as e:
         print("Error accessing NVML:", e)
