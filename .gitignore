@@ -25,3 +25,4 @@ src/out_*.txt
 src/*.gif
 src/*.pkl
 tmp/
+mmpretrain/
