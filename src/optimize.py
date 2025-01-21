@@ -84,12 +84,17 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
             trial.set_user_attr(f'{encoder}_{dataset}_id_loss', float(loss))
             trial.set_user_attr(f'{encoder}_{dataset}_score_id', float(score_id))
             trial.set_user_attr(f'{encoder}_{dataset}_score_ref', float(score_ref))
+            avg=0
             for d_name, v in results['farood'].items():
                 for m, value in v.items():
                     trial.set_user_attr(f'{encoder}_{dataset}_farood_{d_name}_{m}', float(value))
+                    avg += value
             for d_name, v in results['nearood'].items():
                 for m, value in v.items():
                     trial.set_user_attr(f'{encoder}_{dataset}_nearood_{d_name}_{m}', float(value))
+                    avg += value
+            avg /= len(results['farood']) + len(results['nearood'])
+            trial.set_user_attr(f'{encoder}_{dataset}_avg', float(avg))
                 
             if verbose:
                 bar.set_postfix(id=auc, farood=farood, nearood=nearood)
