@@ -134,8 +134,8 @@ def main():
     #['resnet18_32x32_cifar10_open_ood', 'resnet18_32x32_cifar100_open_ood', 'resnet18_224x224_imagenet200_open_ood', 'resnet50_224x224_imagenet_open_ood']
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
-    # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual']
-    methods = ['subVPSDE', 'Residual', 'KNN']
+    # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual', 'KNN']
+    methods = ['subVPSDE', 'KNN']
     jobs = []
     for m in methods:
         jobs.append((objective, features_data, encoders, datasets, m, checkpoints_dir))
