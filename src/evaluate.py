@@ -44,7 +44,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             ood_model.load_state_dict(checkpoint['model'])
             loss = [checkpoint['results']['id']['loss']]
         else:
-            loss = ood_model.fit(data)
+            loss = ood_model.fit(data_train)
     else:
 
         # Hyperparameters

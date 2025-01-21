@@ -135,7 +135,7 @@ def main():
        
     trials = 100
     gpu_nodes = []
-    mem_req = 10
+    mem_req = 15
     for id, gpu in enumerate(device_info):
         if gpu.mem.free > mem_req:
             gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
