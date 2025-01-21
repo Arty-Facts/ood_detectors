@@ -56,7 +56,7 @@ def encode_dataset(encoder_name, dataset_name, aug=False, device='cpu'):
 def main():
 
     # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', , 'swin_t']
-    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'bit', 'dino', 'dinov2', 'vit', 'swin_t']
+    encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'bit', 'dino', 'dinov2']
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100']
     datasets = ['imagenet']
     gpu_nodes = [0, 1, 2, 3]

@@ -68,4 +68,3 @@ remote:
       workspace: ~/ood_detectors/src
     # - name: wood    
     #   workspace: ~/ood_detectors/src
-
