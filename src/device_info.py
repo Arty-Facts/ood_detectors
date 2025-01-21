@@ -21,11 +21,11 @@ class Util():
 class GPU():
     def __init__(self, name, mem_info, util_info):
         self.name = name
-        self.mem_info = mem_info
-        self.util_info = util_info
+        self.mem = mem_info
+        self.util = util_info
 
     def __repr__(self):
-        return f"GPU(name={self.name}, mem_info={self.mem_info}, util_info={self.util_info})"
+        return f"GPU(name={self.name}, mem={self.mem_info}, util={self.util_info})"
 
 class Device():
     def __init__(self):
@@ -37,21 +37,30 @@ class Device():
         for i in range(self.device_count):
             handle = nvmlDeviceGetHandleByIndex(i)
             name = nvmlDeviceGetName(handle)
-            memory = nvmlDeviceGetMemoryInfo(handle)
 
             gpu_util = 0.0
             mem_util = 0.0
+            mem_free = 0.0
+            mem_total = 0.0
+            mem_used = 0.0
             for i in range(10):
+                memory = nvmlDeviceGetMemoryInfo(handle)
                 gpu_util += nvmlDeviceGetUtilizationRates(handle).gpu
                 mem_util += nvmlDeviceGetUtilizationRates(handle).memory
+                mem_free += memory.free
+                mem_total += memory.total
+                mem_used += memory.used
                 time.sleep(0.1)
 
             gpu_util /= 10
             mem_util /= 10
+            mem_free /= 10
+            mem_total /= 10
+            mem_used /= 10
 
             self.gpu_info.append(GPU(
                 name, 
-                Memory(memory.total*1e-9, memory.free*1e-9, memory.used*1e-9),
+                Memory(mem_total*1e-9, mem_free*1e-9, mem_used*1e-9),
                 Util(gpu_util, mem_util))
             )
         
@@ -68,6 +77,5 @@ class Device():
     
 if __name__ == "__main__":
     device = Device()
-    print(device)
-    print(len(device))
-    print(device[0])
+    for i in range(len(device)):
+        print(device[i])

@@ -5,6 +5,7 @@ from evaluate import run
 import multiprocessing as mp
 import random
 import tqdm
+import device_info as di
 # data = {
 #         'features': features_vectors,
 #         'encoder': encoder_name,
@@ -21,15 +22,15 @@ def select_trial(trial,method):
         conf['k'] = trial.suggest_int('KNN.k', 1, 10)
     else:
         conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
-        conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 2048, step = 256)
-        conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 3, 15)
+        conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 1024, step = 256)
+        conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 6, 16, step = 2)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
         conf['dropout'] = trial.suggest_float('dropout', 0.0, 0.5)
-        conf['lr'] = trial.suggest_float('lr', 1e-6, 1e-2, log=True)
+        conf['lr'] = trial.suggest_float('lr', 1e-6, 1e-3, log=True)
         # conf['beta1'] = trial.suggest_float('beta1', 0.5, 0.999)
         # conf['beta2'] = trial.suggest_float('beta2', 0.9, 0.999)
         conf['eps'] = trial.suggest_float('eps', 1e-12, 1e-6, log=True)
-        conf['weight_decay'] = trial.suggest_float('weight_decay', 0.0, 1e-3)
+        conf['weight_decay'] = trial.suggest_float('weight_decay', 1e-12, 1e-3, log=True)
         if method != 'subVPSDE':
             conf['continuous'] = trial.suggest_categorical('continuous', [True, False])
         else:
@@ -41,13 +42,13 @@ def select_trial(trial,method):
         conf['reduce_mean'] = trial.suggest_categorical('reduce_mean', [True, False])
         if method == 'VESDE':
             conf['sigma_min'] = trial.suggest_float('sigma_min', 0.01, 0.1)
-            conf['sigma_max'] = trial.suggest_int('beta_max', 10, 60, step=5)
+            conf['sigma_max'] = trial.suggest_int('beta_max', 5, 60, step=5)
         elif method == 'VPSDE':
             conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_int('beta_max', 10, 30, step=5)
+            conf['beta_max'] = trial.suggest_int('beta_max', 5, 30, step=5)
         elif method == 'subVPSDE':
             conf['beta_min'] = trial.suggest_float('beta_min', 0.0, 1.0)
-            conf['beta_max'] = trial.suggest_int('beta_max', 10, 30, step=5)
+            conf['beta_max'] = trial.suggest_int('beta_max', 5, 30, step=5)
         else:
             raise ValueError(f'Unknown method: {method}')
     return conf
@@ -108,6 +109,7 @@ def ask_tell_optuna(objective_func, data, encoders, datasets, method, device):
 
 def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
+    device_info = di.Device()
     features = pathlib.Path("/mnt/data/arty/data/features_opt")
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
@@ -132,10 +134,16 @@ def main():
         jobs.append((objective, features_data, encoders, datasets, m))
        
     trials = 100
-    gpu_nodes = [0, 1, 2, 3] * 2
+    gpu_nodes = []
+    mem_req = 10
+    for id in device_info:
+        if device_info[id].mem.free > mem_req:
+            gpu_nodes.extend([id]*device_info[id].mem.free//mem_req)
+
+
     random.shuffle(jobs)
     print(f'Running {len(jobs)} jobs...')
-    ops_utils.parallelize(ask_tell_optuna, jobs*trials, gpu_nodes, verbose=True, timeout=60*60*24)
+    ops_utils.parallelize(ask_tell_optuna, jobs*trials, gpu_nodes, verbose=True, timeout=60*60*72)
 
 if __name__ == '__main__':
     mp.freeze_support()

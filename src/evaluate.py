@@ -8,6 +8,7 @@ import ood_detectors.eval_utils as eval_utils
 import ood_detectors.ops_utils as ops_utils
 import functools
 from ood_detectors.residual import Residual
+from ood_detectors.knn import KNN
 import pathlib
 import tqdm
 import yaml
@@ -34,6 +35,16 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             loss = [checkpoint['results']['id']['loss']]
         else:
             loss = ood_model.fit(data_train)
+    elif method == 'KNN':
+        k = conf['k']
+        ood_model = KNN(k=k)
+        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+            checkpoint = torch.load(model_path)
+            ood_model.load_state_dict(checkpoint['model'])
+            loss = [checkpoint['results']['id']['loss']]
+        else:
+            loss = ood_model.fit(data)
     else:
 
         # Hyperparameters
