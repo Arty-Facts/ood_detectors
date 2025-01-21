@@ -25,7 +25,7 @@ class GPU():
         self.util = util_info
 
     def __repr__(self):
-        return f"GPU(name={self.name}, mem={self.mem}, util={self.util})"
+        return f"GPU(name={self.name}, util={self.util} mem={self.mem})"
 
 class Device():
     def __init__(self):
@@ -58,9 +58,14 @@ class Device():
             mem_total /= 10
             mem_used /= 10
 
+            to_gb = 1024**3
+            mem_free /= to_gb
+            mem_total /= to_gb
+            mem_used /= to_gb
+
             self.gpu_info.append(GPU(
                 name, 
-                Memory(mem_total*1e-9, mem_free*1e-9, mem_used*1e-9),
+                Memory(mem_total, mem_free, mem_used),
                 Util(gpu_util, mem_util))
             )
         
