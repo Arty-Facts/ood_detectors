@@ -21,7 +21,8 @@ def select_trial(trial,method):
     elif method == 'KNN':
         conf['k'] = trial.suggest_int('KNN.k', 1, 10)
     else:
-        conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
+        # conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
+        conf['n_epochs'] = 3
         conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 1024, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 6, 16, step = 2)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
@@ -141,10 +142,10 @@ def main():
         if gpu.mem.free > mem_req:
             gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
 
-
+    jobs = jobs*trials
     random.shuffle(jobs)
     print(f'Running {len(jobs)} jobs...')
-    ops_utils.parallelize(ask_tell_optuna, jobs*trials, gpu_nodes, verbose=True, timeout=60*60*72)
+    ops_utils.parallelize(ask_tell_optuna, jobs, gpu_nodes, verbose=True, timeout=60*60*72)
 
 if __name__ == '__main__':
     mp.freeze_support()
