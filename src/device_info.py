@@ -25,7 +25,7 @@ class GPU():
         self.util = util_info
 
     def __repr__(self):
-        return f"GPU(name={self.name}, mem={self.mem_info}, util={self.util_info})"
+        return f"GPU(name={self.name}, mem={self.mem}, util={self.util})"
 
 class Device():
     def __init__(self):
