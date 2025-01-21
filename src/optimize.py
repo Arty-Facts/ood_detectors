@@ -138,7 +138,7 @@ def main():
     mem_req = 10
     for id, gpu in enumerate(device_info):
         if gpu.mem.free > mem_req:
-            gpu_nodes.extend([id]*gpu.mem.free//mem_req)
+            gpu_nodes.extend([id]*(gpu.mem.free//mem_req))
 
 
     random.shuffle(jobs)
