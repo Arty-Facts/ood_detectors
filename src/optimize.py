@@ -110,7 +110,7 @@ def ask_tell_optuna(objective_func, data, encoders, datasets, method, device):
 def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     device_info = di.Device()
-    features = pathlib.Path("/mnt/data/arty/data/features_opt")
+    features = pathlib.Path("/mnt/data/arty/data/features_ood_2025")
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
