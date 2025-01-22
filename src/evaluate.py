@@ -16,9 +16,22 @@ import multiprocessing as mp
 import random
 
 def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoints="results"):
+    if encoder not in data:
+        raise ValueError(f"Encoder {encoder} not found in data. found {data.keys()}")
+    if dataset not in data[encoder]:
+        raise ValueError(f"Dataset {dataset} not found in data[{encoder}] . found {data[encoder].keys()}")
+    if 'id' not in data[encoder][dataset]:
+        raise ValueError(f"Dataset {dataset} does not have id data[{encoder}]. found {data[encoder][dataset].keys()}")
+    if 'test' not in data[encoder][dataset]['id']:
+        raise ValueError(f"Dataset {dataset} does not have test data[{encoder}]. found {data[encoder][dataset]['id'].keys()}")
+    if 'train' not in data[encoder][dataset]['id']:
+        raise ValueError(f"Dataset {dataset} does not have train data[{encoder}]. found {data[encoder][dataset]['id'].keys()}")
+    
     train_data_path = data[encoder][dataset]["id"]["train"]
     batch_size = conf.get('batch_size', 1024)
+    file_size = pathlib.Path(train_data_path).stat().st_size / 1024**3
     with open(train_data_path, 'rb') as f:
+        print(f"Loading data from {train_data_path}, size: {file_size:.2f} GB")
         train_blob = pickle.load(f)
     data_train = train_blob['features']
     if reduce_data_train > 0:
@@ -107,6 +120,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             )
         if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
             model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+            print(f"Loading model from {model_path}")
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
             loss = [checkpoint['results']['id']['loss']]

@@ -56,8 +56,8 @@ notebook_token: ood
 notebook_password: ood
 remote:
   hosts:
-    # - name: nuke
-    #   workspace: ~/ood_detectors/src
+    - name: nuke
+      workspace: ~/ood_detectors/src
     - name: dust
       workspace: ~/ood_detectors/src
     - name: mirage

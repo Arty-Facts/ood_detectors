@@ -135,17 +135,19 @@ def main():
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
     # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual', 'KNN']
-    methods = ['subVPSDE', 'KNN']
+    methods = ['subVPSDE']
     jobs = []
     for m in methods:
         jobs.append((objective, features_data, encoders, datasets, m, checkpoints_dir))
        
     trials = 100
     gpu_nodes = []
-    mem_req = 15
+    mem_req = 13
     for id, gpu in enumerate(device_info):
         if gpu.mem.free > mem_req:
             gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
+    if len(gpu_nodes) == 0:
+        raise ValueError('No available GPU nodes')
 
     jobs = jobs*trials
     random.shuffle(jobs)
