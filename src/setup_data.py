@@ -42,7 +42,7 @@ def encode_dataset(encoder_name, dataset_name, aug=False, device='cpu'):
         if features_path.exists():
             print('Skipping', encoder_name, dataset_name, name, type_name)
             continue
-        if aug and type_name == 'train':
+        if aug and name == 'train':
             features_vectors = []
             for _ in range(3):
                 features_vectors.append(vision.extract_features(encoder, dataset, batch_size=64, num_workers=2, device=device))
