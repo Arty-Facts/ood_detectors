@@ -35,6 +35,7 @@ def encode_dataset(encoder_name, dataset_name, aug=False, device='cpu'):
 
     for type_name, name, dataset in jobs:
         type_name_path = dataset_name_path / type_name
+        type_name_path.mkdir(exist_ok=True)
         name_path = type_name_path / name
         name_path.mkdir(exist_ok=True)
         features_path = name_path / 'feature_data.pkl'
