@@ -106,7 +106,10 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
 
 def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoints_dir, device):
     study_name = f'{method}'
+    if not pathlib.Path(checkpoints_dir).exists():
+        pathlib.Path(checkpoints_dir).mkdir(parents=True)
     db = f'sqlite:///{checkpoints_dir}optuna_v3.db'
+    print(f'Using {db}')
     study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
     res = objective_func(trial, data, encoders, datasets, method, checkpoints_dir, device)
