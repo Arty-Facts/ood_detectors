@@ -134,6 +134,10 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             )
 
     score_id = ood_model.predict(data_train, batch_size, verbose=verbose)
+    if 'test' not in data[encoder][dataset]['id']:
+        raise ValueError(f"Dataset {dataset} does not have test data[{encoder}]. found {data[encoder][dataset]['id'].keys()}")
+    file_size = pathlib.Path(data[encoder][dataset]["id"]["test"]).stat().st_size / 1024**3
+    print(f"Loading test data from {data[encoder][dataset]['id']['test']}, size: {file_size:.2f} GB")
     test_data_path = data[encoder][dataset]["id"]["test"]
     with open(test_data_path, 'rb') as f:
         test_blob = pickle.load(f)
@@ -162,6 +166,8 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
         if name not in results:
             results[name] = {}
         for type_name, data in datasets.items():
+            file_size = pathlib.Path(data).stat().st_size / 1024**3
+            print(f"Loading OOD data from {data}, size: {file_size:.2f} GB")
             with open(data, 'rb') as f:
                 ood_data = pickle.load(f)
             data = ood_data['features']
