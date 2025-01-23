@@ -15,7 +15,7 @@ import yaml
 import multiprocessing as mp
 import random
 
-def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoint_dir="results"):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoint_dir="results", load_resutls=False):
     if encoder not in data:
         raise ValueError(f"Encoder {encoder} not found in data. found {data.keys()}")
     if dataset not in data[encoder]:
@@ -26,7 +26,6 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
         raise ValueError(f"Dataset {dataset} does not have test data[{encoder}]. found {data[encoder][dataset]['id'].keys()}")
     if 'train' not in data[encoder][dataset]['id']:
         raise ValueError(f"Dataset {dataset} does not have train data[{encoder}]. found {data[encoder][dataset]['id'].keys()}")
-    
     train_data_path = data[encoder][dataset]["id"]["train"]
     batch_size = conf.get('batch_size', 1024)
     file_size = pathlib.Path(train_data_path).stat().st_size / 1024**3
@@ -41,7 +40,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     if method == 'Residual':
         dims = conf['dims']
         ood_model = Residual(dims=dims)
-        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists() and load_resutls:
             model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
@@ -51,7 +50,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     elif method == 'KNN':
         k = conf['k']
         ood_model = KNN(k=k)
-        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists() and load_resutls:
             model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
@@ -118,7 +117,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             reduce_mean=reduce_mean,
             likelihood_weighting=likelihood_weighting,
             )
-        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists() and load_resutls:
             model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             print(f"Loading model from {model_path}")
             checkpoint = torch.load(model_path)
@@ -189,17 +188,17 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     checkpoint_path = pathlib.Path(checkpoint_dir)
     checkpoint_path.mkdir(parents=True, exist_ok=True)
     model_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
-    torch.save({
-        "config": conf,
-        "model": ood_model.state_dict(),
-        "results": results,
-        "method": method,
-        "encoder": encoder,
-        "dataset": dataset,
-    }, model_path)
+    # torch.save({
+    #     "config": conf,
+    #     "model": ood_model.state_dict(),
+    #     "results": results,
+    #     "method": method,
+    #     "encoder": encoder,
+    #     "dataset": dataset,
+    # }, model_path)
 
-    with open(checkpoint_path/f"{method}_{dataset}_{encoder}_scores.pkl", 'wb') as f:
-        pickle.dump(scores, f)
+    # with open(checkpoint_path/f"{method}_{dataset}_{encoder}_scores.pkl", 'wb') as f:
+    #     pickle.dump(scores, f)
     return results
 
 def objective(method, encoder, dataset, method_configs, checkpoints, device):
