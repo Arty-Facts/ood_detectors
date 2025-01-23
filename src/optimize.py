@@ -106,7 +106,7 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
 
 def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoints_dir, device):
     study_name = f'{method}'
-    db = f'sqlite:///optuna_v3.db'
+    db = f'sqlite:///{checkpoints_dir}optuna_v3.db'
     study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
     res = objective_func(trial, data, encoders, datasets, method, checkpoints_dir, device)
@@ -117,7 +117,7 @@ def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     device_info = di.Device()
     features = pathlib.Path("/mnt/data/arty/data/features_ood_2025")
-    checkpoints_dir = "/mnt/data/arty/data/checkpoints/ood_2025"
+    checkpoints_dir = "/mnt/data/arty/data/checkpoints/ood_2025/"
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:

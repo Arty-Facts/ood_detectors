@@ -15,7 +15,7 @@ import yaml
 import multiprocessing as mp
 import random
 
-def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoints="results"):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoint_dir="results"):
     if encoder not in data:
         raise ValueError(f"Encoder {encoder} not found in data. found {data.keys()}")
     if dataset not in data[encoder]:
@@ -41,8 +41,8 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     if method == 'Residual':
         dims = conf['dims']
         ood_model = Residual(dims=dims)
-        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
-            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
             loss = [checkpoint['results']['id']['loss']]
@@ -51,8 +51,8 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
     elif method == 'KNN':
         k = conf['k']
         ood_model = KNN(k=k)
-        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
-            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
             loss = [checkpoint['results']['id']['loss']]
@@ -118,8 +118,8 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             reduce_mean=reduce_mean,
             likelihood_weighting=likelihood_weighting,
             )
-        if pathlib.Path(f"{checkpoints}/{method}_{dataset}_{encoder}.pt").exists():
-            model_path = f"{checkpoints}/{method}_{dataset}_{encoder}.pt"
+        if pathlib.Path(f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt").exists():
+            model_path = f"{checkpoint_dir}{method}_{dataset}_{encoder}.pt"
             print(f"Loading model from {model_path}")
             checkpoint = torch.load(model_path)
             ood_model.load_state_dict(checkpoint['model'])
@@ -180,7 +180,7 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             scores[name][type_name] = score_ood
             ood_auc_mean.append(ood_auc)
     mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
-    checkpoint_path = pathlib.Path(checkpoints)
+    checkpoint_path = pathlib.Path(checkpoint_dir)
     checkpoint_path.mkdir(parents=True, exist_ok=True)
     model_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
     torch.save({
