@@ -68,7 +68,7 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
         for dataset in datasets:
             if verbose:
                 bar.set_description(f'Method: {method}, Encoder: {encoder}, Dataset: {dataset}')
-            results = run(conf, data, encoder, dataset, method, device, checkpoints=checkpoints_dir)
+            results = run(conf, data, encoder, dataset, method, device, checkpoints_dir=checkpoints_dir)
             auc = results['id']["AUC"]
             fpr = results['id']["FPR_95"]
             loss = results['id']['loss']
