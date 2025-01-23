@@ -144,11 +144,11 @@ def main():
         jobs.append((objective, features_data, encoders, datasets, m, checkpoint_dir))
        
     trials = 100
-    gpu_nodes = [0]
+    gpu_nodes = []
     mem_req = 13
-    # for id, gpu in enumerate(device_info):
-    #     if gpu.mem.free > mem_req:
-    #         gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
+    for id, gpu in enumerate(device_info):
+        if gpu.mem.free > mem_req:
+            gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
     if len(gpu_nodes) == 0:
         raise ValueError('No available GPU nodes')
 
