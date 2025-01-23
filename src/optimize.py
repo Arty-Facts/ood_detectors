@@ -55,7 +55,7 @@ def select_trial(trial,method):
     return conf
 
 
-def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, verbose=True):
+def objective(trial, data, encoders, datasets, method, checkpoint_dir, device, verbose=True):
     conf = select_trial(trial, method)
     ids = []
     faroods = []
@@ -68,7 +68,7 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
         for dataset in datasets:
             if verbose:
                 bar.set_description(f'Method: {method}, Encoder: {encoder}, Dataset: {dataset}')
-            results = run(conf, data, encoder, dataset, method, device, checkpoints_dir=checkpoints_dir)
+            results = run(conf, data, encoder, dataset, method, device, checkpoint_dir=checkpoint_dir)
             auc = results['id']["AUC"]
             fpr = results['id']["FPR_95"]
             loss = results['id']['loss']
@@ -104,15 +104,15 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
     nearood = sum(nearoods) / len(nearoods)
     return nearood, farood, abs(id-0.5)
 
-def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoints_dir, device):
+def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoint_dir, device):
     study_name = f'{method}'
-    if not pathlib.Path(checkpoints_dir).exists():
-        pathlib.Path(checkpoints_dir).mkdir(parents=True)
+    if not pathlib.Path(checkpoint_dir).exists():
+        pathlib.Path(checkpoint_dir).mkdir(parents=True)
     db = f'sqlite:///optuna_v3.db'
     print(f'Using {db}')
     study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
-    res = objective_func(trial, data, encoders, datasets, method, checkpoints_dir, device)
+    res = objective_func(trial, data, encoders, datasets, method, checkpoint_dir, device)
     study.tell(trial, res)
         
 
@@ -120,7 +120,7 @@ def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     device_info = di.Device()
     features = pathlib.Path("/mnt/data/arty/data/features_ood_2025")
-    checkpoints_dir = "/mnt/data/arty/data/checkpoints/ood_2025/"
+    checkpoint_dir = "/mnt/data/arty/data/checkpoints/ood_2025/"
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
@@ -141,7 +141,7 @@ def main():
     methods = ['subVPSDE']
     jobs = []
     for m in methods:
-        jobs.append((objective, features_data, encoders, datasets, m, checkpoints_dir))
+        jobs.append((objective, features_data, encoders, datasets, m, checkpoint_dir))
        
     trials = 100
     gpu_nodes = [0]
