@@ -15,7 +15,7 @@ import yaml
 import multiprocessing as mp
 import random
 
-def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoint_dir="results", load_resutls=False):
+def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduce_data_train=-1, verbose=False, checkpoint_dir="results", load_resutls=False, save_results=False):
     if encoder not in data:
         raise ValueError(f"Encoder {encoder} not found in data. found {data.keys()}")
     if dataset not in data[encoder]:
@@ -185,20 +185,21 @@ def run(conf, data, encoder, dataset, method, device, reduce_data_eval=-1, reduc
             scores[name][type_name] = score_ood
             ood_auc_mean.append(ood_auc)
     mean_auc = int((sum(ood_auc_mean) / len(ood_auc_mean))*1000)
-    checkpoint_path = pathlib.Path(checkpoint_dir)
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    model_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
-    # torch.save({
-    #     "config": conf,
-    #     "model": ood_model.state_dict(),
-    #     "results": results,
-    #     "method": method,
-    #     "encoder": encoder,
-    #     "dataset": dataset,
-    # }, model_path)
+    if save_results:
+        checkpoint_path = pathlib.Path(checkpoint_dir)
+        checkpoint_path.mkdir(parents=True, exist_ok=True)
+        model_path = checkpoint_path / f"{method}_{dataset}_{encoder}.pt"
+        torch.save({
+            "config": conf,
+            "model": ood_model.state_dict(),
+            "results": results,
+            "method": method,
+            "encoder": encoder,
+            "dataset": dataset,
+        }, model_path)
 
-    # with open(checkpoint_path/f"{method}_{dataset}_{encoder}_scores.pkl", 'wb') as f:
-    #     pickle.dump(scores, f)
+        with open(checkpoint_path/f"{method}_{dataset}_{encoder}_scores.pkl", 'wb') as f:
+            pickle.dump(scores, f)
     return results
 
 def objective(method, encoder, dataset, method_configs, checkpoints, device):
