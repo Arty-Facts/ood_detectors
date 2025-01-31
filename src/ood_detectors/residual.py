@@ -113,7 +113,7 @@ class Residual:
             batch_numpy = to_numpy(batch)
             batch_numpy = batch_numpy.astype(np.float32)
             batch_scores = np.linalg.norm((batch_numpy - self.u) @ self.ns, axis=-1)
-            scores.append(batch_scores)
+            scores.append(batch_scores.squeeze())
         return np.concatenate(scores)
 
     def __call__(self, *args, **kwargs):
