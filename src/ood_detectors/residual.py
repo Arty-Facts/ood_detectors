@@ -127,7 +127,7 @@ class Residual:
             device: Device to move the model to.
 
         """
-        pass
+        return self
 
     def state_dict(self):
         """
