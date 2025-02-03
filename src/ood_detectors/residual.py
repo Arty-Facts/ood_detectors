@@ -27,6 +27,7 @@ class Residual(torch.nn.Module):
     """
 
     def __init__(self, dims=512, u=0):
+        super().__init__()
         self.dims = dims
         self.u = u
         self.name = "Residual"
@@ -72,7 +73,7 @@ class Residual(torch.nn.Module):
         self.ns = np.ascontiguousarray(
             (eigen_vectors.T[np.argsort(eig_vals * -1)[self.dims :]]).T
         ).astype(np.float32)
-        self.ns = torch.tensor(self.ns, dtype=torch.float32, device=self.device, requires_grad=True)
+        self.ns = torch.tensor(self.ns, dtype=torch.float32, device=self.device)
         return [-1]
     
     def forward(self, x):
@@ -111,11 +112,8 @@ class Residual(torch.nn.Module):
         for (batch,) in data_loader:
             batch = batch.to(self.device)
             batch_scores = self.forward(batch)
-            scores.append(batch_scores.cpu().numpy().squeeze())
+            scores.append(batch_scores.detach().cpu().numpy().squeeze())
         return np.concatenate(scores)
-
-    def __call__(self, *args, **kwargs):
-        return self.predict(*args, **kwargs)
 
     def to(self, device):
         """
