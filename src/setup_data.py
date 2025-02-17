@@ -20,39 +20,46 @@ def encode_dataset(encoder_name, dataset_name, aug=False, device='cpu'):
     encoder = vision.get_encoder(encoder_name)
     encoder.eval()
     if aug:
-        datasets = vision.get_datasets(dataset_name, data_root=data_root, image_list_root=image_list_root, transform=encoder.transform, train_transform=encoder.train_transform)
+        image_datasets = vision.get_datasets(dataset_name, data_root=data_root, image_list_root=image_list_root, transform=encoder.transform, train_transform=encoder.train_transform)
     else:
-        datasets = vision.get_datasets(dataset_name, data_root=data_root, image_list_root=image_list_root, transform=encoder.transform)
-    for type_name, datasets in datasets.items():
+        image_datasets = vision.get_datasets(dataset_name, data_root=data_root, image_list_root=image_list_root, transform=encoder.transform)
+    jobs = []
+
+    for type_name, datasets in image_datasets.items():
         if type_name == 'csid':
             continue
+        for name, dataset in datasets.items():
+            jobs.append((type_name, name, dataset))
+
+    random.shuffle(jobs)
+
+    for type_name, name, dataset in jobs:
         type_name_path = dataset_name_path / type_name
         type_name_path.mkdir(exist_ok=True)
-        for name, dataset in datasets.items():
-            name_path = type_name_path / name
-            name_path.mkdir(exist_ok=True)
-            features_path = name_path / 'feature_data.pkl'
-            if features_path.exists():
-                print('Skipping', encoder_name, dataset_name, name, type_name)
-                continue
-            if aug:
-                features_vectors = []
-                for _ in range(10):
-                    features_vectors.append(vision.extract_features(encoder, dataset, batch_size=64, num_workers=2, device=device))
-                features_vectors = torch.cat(features_vectors, dim=0)
-            else:        
-                features_vectors = vision.extract_features(encoder, dataset, batch_size=64, num_workers=2, device=device)
-            
-            print(encoder_name, dataset_name, name, type_name, features_vectors.shape)
-            data = {
-                'features': features_vectors,
-                'encoder': encoder_name,
-                'target_dataset': dataset_name,
-                'dataset': name,
-                'type': type_name
-            }
-            with open(features_path, 'wb') as f:
-                pickle.dump(data, f)
+        name_path = type_name_path / name
+        name_path.mkdir(exist_ok=True)
+        features_path = name_path / 'feature_data.pkl'
+        if features_path.exists():
+            print('Skipping', encoder_name, dataset_name, name, type_name)
+            continue
+        if aug and name == 'train':
+            features_vectors = []
+            for _ in range(3):
+                features_vectors.append(vision.extract_features(encoder, dataset, batch_size=64, num_workers=2, device=device))
+            features_vectors = torch.cat(features_vectors, dim=0)
+        else:        
+            features_vectors = vision.extract_features(encoder, dataset, batch_size=64, num_workers=2, device=device)
+        
+        print(encoder_name, dataset_name, name, type_name, features_vectors.shape)
+        data = {
+            'features': features_vectors,
+            'encoder': encoder_name,
+            'target_dataset': dataset_name,
+            'dataset': name,
+            'type': type_name
+        }
+        with open(features_path, 'wb') as f:
+            pickle.dump(data, f)
 def main():
 
     # encoders = ['repvgg', 'resnet50d', 'swin', 'deit', 'dino', 'dinov2', 'vit', 'clip', , 'swin_t']

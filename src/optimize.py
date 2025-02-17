@@ -22,7 +22,7 @@ def select_trial(trial,method):
         conf['k'] = trial.suggest_int('KNN.k', 1, 10)
     else:
         # conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
-        conf['n_epochs'] = 3
+        conf['n_epochs'] = 5
         conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 1024, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 6, 16, step = 2)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
@@ -55,7 +55,7 @@ def select_trial(trial,method):
     return conf
 
 
-def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, verbose=True):
+def objective(trial, data, encoders, datasets, method, checkpoint_dir, device, verbose=True):
     conf = select_trial(trial, method)
     ids = []
     faroods = []
@@ -68,7 +68,7 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
         for dataset in datasets:
             if verbose:
                 bar.set_description(f'Method: {method}, Encoder: {encoder}, Dataset: {dataset}')
-            results = run(conf, data, encoder, dataset, method, device, checkpoints=checkpoints_dir)
+            results = run(conf, data, encoder, dataset, method, device, checkpoint_dir=checkpoint_dir)
             auc = results['id']["AUC"]
             fpr = results['id']["FPR_95"]
             loss = results['id']['loss']
@@ -104,12 +104,13 @@ def objective(trial, data, encoders, datasets, method, checkpoints_dir, device, 
     nearood = sum(nearoods) / len(nearoods)
     return nearood, farood, abs(id-0.5)
 
-def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoints_dir, device):
+def ask_tell_optuna(objective_func, data, encoders, datasets, method, checkpoint_dir, device):
     study_name = f'{method}'
     db = f'sqlite:///optuna_v3.db'
+    print(f'Using {db}')
     study = optuna.create_study(directions=[ 'maximize', 'maximize', 'minimize'], study_name=study_name, storage=db, load_if_exists=True)
     trial = study.ask()
-    res = objective_func(trial, data, encoders, datasets, method, checkpoints_dir, device)
+    res = objective_func(trial, data, encoders, datasets, method, checkpoint_dir, device)
     study.tell(trial, res)
         
 
@@ -117,7 +118,7 @@ def main():
     # features = pathlib.Path(r"H:\arty\data\features_opt")
     device_info = di.Device()
     features = pathlib.Path("/mnt/data/arty/data/features_ood_2025")
-    checkpoints_dir = "/mnt/data/arty/data/checkpoints/ood_2025"
+    checkpoint_dir = "/mnt/data/arty/data/checkpoints/ood_2025/"
     features_data = {}
     all_pkl = list(features.rglob("*.pkl"))
     for path in all_pkl:
@@ -135,17 +136,19 @@ def main():
     # datasets = ['imagenet', 'imagenet200', 'cifar10', 'cifar100', 'covid', 'mnist']
     datasets = ['imagenet']
     # methods = ['VESDE', 'VPSDE', 'subVPSDE', 'Residual', 'KNN']
-    methods = ['subVPSDE', 'KNN']
+    methods = ['subVPSDE']
     jobs = []
     for m in methods:
-        jobs.append((objective, features_data, encoders, datasets, m, checkpoints_dir))
+        jobs.append((objective, features_data, encoders, datasets, m, checkpoint_dir))
        
     trials = 100
     gpu_nodes = []
-    mem_req = 15
+    mem_req = 13
     for id, gpu in enumerate(device_info):
         if gpu.mem.free > mem_req:
             gpu_nodes.extend([id]*int(gpu.mem.free/mem_req))
+    if len(gpu_nodes) == 0:
+        raise ValueError('No available GPU nodes')
 
     jobs = jobs*trials
     random.shuffle(jobs)
