@@ -444,7 +444,7 @@ def get_encoder(name):
         return Swin_T()
     elif name in ['clip']:
         return ClipVisionModel()
-    elif name in ['resnet18_32x32_cifar10_open_ood']:
+    elif name in ['resnet18_32x32_cifar10', 'resnet18_32x32_cifar10_open_ood']:
         model = ResNet18_32x32()
         checkpoint = pathlib.Path('checkpoints/')
         checkpoint.mkdir(exist_ok=True)
@@ -464,9 +464,9 @@ def get_encoder(name):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['cifar10'])
         ])
-        model.name = 'resnet18_32x32_cifar10_open_ood'
+        model.name = 'resnet18_32x32_cifar10'
         return model
-    elif name in ['resnet18_32x32_cifar100_open_ood']:
+    elif name in ['resnet18_32x32_cifar100', 'resnet18_32x32_cifar100_open_ood']:
         model = ResNet18_32x32(num_classes=100)
         checkpoint = pathlib.Path('checkpoints/')
         checkpoint.mkdir(exist_ok=True)
@@ -486,9 +486,9 @@ def get_encoder(name):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(*normalization_dict['cifar100'])
         ])
-        model.name = 'resnet18_32x32_cifar100_open_ood'
+        model.name = 'resnet18_32x32_cifar100'
         return model
-    elif name in ['resnet18_224x224_imagenet200_open_ood']:
+    elif name in ['resnet18_224x224_imagenet200','resnet18_224x224_imagenet200_open_ood']:
         model = ResNet18_224x224(num_classes=200)
         checkpoint = pathlib.Path('checkpoints/')
         checkpoint.mkdir(exist_ok=True)
@@ -510,9 +510,9 @@ def get_encoder(name):
             torchvision.transforms.Normalize(*normalization_dict['imagenet'])
         ])
 
-        model.name = 'resnet18_224x224_imagenet200_open_ood'
+        model.name = 'resnet18_224x224_imagenet200'
         return model
-    elif name in ['resnet50_224x224_imagenet_open_ood']:
+    elif name in ['resnet50_224x224_imagenet', 'resnet50_224x224_imagenet_open_ood']:
         model = ResNet50(num_classes=1000)
         checkpoint = pathlib.Path('checkpoints/')
         checkpoint.mkdir(exist_ok=True)
@@ -534,7 +534,7 @@ def get_encoder(name):
             torchvision.transforms.Normalize(*normalization_dict['imagenet'])
         ])
 
-        model.name = 'resnet50_224x224_imagenet_open_ood'
+        model.name = 'resnet50_224x224_imagenet'
         return model
     else:
         raise ValueError(f"Encoder {name} not available. Available encoders: {AVAILABLE_ENCODERS}")
