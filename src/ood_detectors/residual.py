@@ -176,7 +176,7 @@ class ResidualX():
     
     def fit(self, data, *args, verbose=True, **kwargs):
         samples = int(len(data) * self.subsample)
-        splits = [np.random.permutation(len(data))[:samples] for _ in range(0, len(data))]
+        splits = [np.random.permutation(len(data))[:samples] for _ in range(0, len(data)-1)] + [np.arange(len(data))]
         if verbose:
             iter = tqdm.tqdm(list(zip(self.ood_detectors, splits)))
         else:
