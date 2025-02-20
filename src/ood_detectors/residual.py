@@ -4,7 +4,7 @@ import torch
 import tqdm
 
 
-class Residual:
+class Residual(torch.nn.Module):
     """
     Residual class for outlier detection.
 
@@ -27,9 +27,12 @@ class Residual:
     """
 
     def __init__(self, dims=512, u=0):
+        super().__init__()
         self.dims = dims
         self.u = u
         self.name = "Residual"
+        self.ns = torch.tensor([])
+        self.device = "cpu"
 
     def fit(self, data, *args, collate_fn=None, **kwargs):
         """
@@ -70,7 +73,11 @@ class Residual:
         self.ns = np.ascontiguousarray(
             (eigen_vectors.T[np.argsort(eig_vals * -1)[self.dims :]]).T
         ).astype(np.float32)
+        self.ns = torch.tensor(self.ns, dtype=torch.float32, device=self.device)
         return [-1]
+    
+    def forward(self, x):
+        return torch.linalg.norm((x - self.u) @ self.ns, dim=-1)
 
     def predict(self, data, batch_size=1024, *args, collate_fn=None, **kwargs):
         """
@@ -85,13 +92,6 @@ class Residual:
         Returns:
             numpy.ndarray: Outlier scores for the input data.
         """
-        def to_numpy(data_batch):
-            if isinstance(data_batch, torch.Tensor):
-                return data_batch.cpu().numpy()
-            elif isinstance(data_batch, (list, tuple)):
-                return np.array(data_batch)
-            return data_batch
-
         if isinstance(data, (list, tuple, np.ndarray)):
             data = torch.tensor(data, dtype=torch.float32)
             dataset = torch.utils.data.TensorDataset(data)
@@ -109,15 +109,11 @@ class Residual:
             raise TypeError("Unsupported data type: {}".format(type(data)))
 
         scores = []
-        for batch in data_loader:
-            batch_numpy = to_numpy(batch)
-            batch_numpy = batch_numpy.astype(np.float32)
-            batch_scores = np.linalg.norm((batch_numpy - self.u) @ self.ns, axis=-1)
-            scores.append(batch_scores)
+        for (batch,) in data_loader:
+            batch = batch.to(self.device)
+            batch_scores = self.forward(batch)
+            scores.append(batch_scores.detach().cpu().numpy().squeeze())
         return np.concatenate(scores)
-
-    def __call__(self, *args, **kwargs):
-        return self.predict(*args, **kwargs)
 
     def to(self, device):
         """
@@ -127,7 +123,9 @@ class Residual:
             device: Device to move the model to.
 
         """
-        pass
+        self.ns = self.ns.to(device)
+        self.device = device
+        return self
 
     def state_dict(self):
         """
@@ -212,5 +210,16 @@ class ResidualX():
             return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter]).mean(axis=0)
         else:
             return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter])
+        
+    def forward(self, x, *args, reduce=True, verbose=True, **kwargs):
+        if verbose:
+            iter = tqdm.tqdm(self.ood_detectors)
+        else:
+            iter = self.ood_detectors
+
+        if reduce:
+            return torch.stack([ood_detector(x,*args, **kwargs) for ood_detector in iter]).mean(axis=0)
+        else:
+            return torch.stack([ood_detector(x,*args, **kwargs) for ood_detector in iter])
     
     

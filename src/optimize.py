@@ -22,7 +22,7 @@ def select_trial(trial,method):
         conf['k'] = trial.suggest_int('KNN.k', 1, 10)
     else:
         # conf['n_epochs'] = trial.suggest_int('n_epochs', 1000, 5000, step=1000)
-        conf['n_epochs'] = 3
+        conf['n_epochs'] = 5
         conf['bottleneck_channels'] = trial.suggest_int('bottleneck_channels', 512, 1024, step = 256)
         conf['num_res_blocks'] = trial.suggest_int('num_res_blocks', 6, 16, step = 2)
         conf['time_embed_dim'] = trial.suggest_int('time_embed_dim', 256, 1024, step = 256)
