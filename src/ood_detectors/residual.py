@@ -157,9 +157,10 @@ class Residual:
 
 
 class ResidualX():
-    def __init__(self, dims=0.5, k=2):
+    def __init__(self, dims=0.5, k=2, subsample=0.5):
         super().__init__()
         self.ood_detectors = [Residual(dims=dims) for _ in range(k)]
+        self.subsample = subsample
         self.name = f"Residualx{k}"
         self.device = "cpu"
 
@@ -176,8 +177,8 @@ class ResidualX():
         return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
     
     def fit(self, data, *args, verbose=True, **kwargs):
-        perm = np.random.permutation(len(data))
-        splits = np.array_split(perm, len(self.ood_detectors))
+        samples = int(len(data) * self.subsample)
+        splits = [np.random.permutation(len(data))[:samples] for _ in range(0, len(data))]
         if verbose:
             iter = tqdm.tqdm(list(zip(self.ood_detectors, splits)))
         else:
