@@ -200,7 +200,7 @@ class ResidualX(torch.nn.Module):
         self.name = f"ResidualX{k}"
         self.device = "cpu"
         self.full_dims = full_dims
-        self.layers = torch.nn.ModuleList(self.ood_detectors)
+        self.mods = torch.nn.ModuleList(self.ood_detectors)
 
     def to(self, device):
         self.device = device
