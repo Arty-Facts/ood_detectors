@@ -216,7 +216,7 @@ class ResidualX(torch.nn.Module):
     def state_dict(self):
         return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
     
-    def fit(self, data, *args, verbose=True, **kwargs):
+    def fit(self, data, *args, verbose=False, **kwargs):
         samples = [int(len(data) * ss) for ss in self.subsample]
         splits = [np.random.permutation(len(data))[:s] for s in samples] + [np.arange(len(data))]
         if verbose:
@@ -242,7 +242,7 @@ class ResidualX(torch.nn.Module):
         return loss
 
 
-    def predict(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
+    def predict(self, x, *args, reduce=True, verbose=False, normalize=True, **kwargs):
         detectors = tqdm.tqdm(self.ood_detectors) if verbose else self.ood_detectors
         scores = []
         for od in detectors:
@@ -253,7 +253,7 @@ class ResidualX(torch.nn.Module):
         scores = np.stack(scores)
         return scores.mean(axis=0) if reduce else scores
 
-    def forward(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
+    def forward(self, x, *args, reduce=True, verbose=False, normalize=True, **kwargs):
         detectors = tqdm.tqdm(self.ood_detectors) if verbose else self.ood_detectors
         outputs = []
         for od in detectors:
