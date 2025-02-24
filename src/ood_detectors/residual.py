@@ -49,16 +49,14 @@ class Residual(torch.nn.Module):
         """
             
         if isinstance(data, (list, tuple)):
-            data = np.array(data)
-        elif isinstance(data, torch.Tensor):
-            data = data.cpu().numpy()
+            data = torch.tensor(data, dtype=torch.float32)
         elif isinstance(data, torch.utils.data.Dataset):
             if collate_fn is None and getattr(data, 'collate_fn', None) is not None:
                 collate_fn = data.collate_fn
             if collate_fn is None:
-                data = np.vstack([x.cpu().numpy() for x, *_ in data])
+                data = torch.vstack([x for x, *_ in data])
             else:
-                data = np.vstack([collate_fn([d]).cpu().numpy() for d in data])
+                data = torch.vstack([collate_fn([d])for d in data])
         feat_dim = data.shape[-1]
         if self.dims is None:
             self.dims = 1000 if feat_dim >= 2048 else 512 
@@ -67,15 +65,18 @@ class Residual(torch.nn.Module):
         if self.dims < 2:
             self.dims = 2
     
-        ec = EmpiricalCovariance(assume_centered=True)
-        ec.fit(data - self.u)
-        eig_vals, eigen_vectors = np.linalg.eig(ec.covariance_)
-        self.ns = np.ascontiguousarray(
-            (eigen_vectors.T[np.argsort(eig_vals * -1)[self.dims :]]).T
-        ).astype(np.float32)
-        self.ns = torch.tensor(self.ns, dtype=torch.float32, device=self.device)
+        x = data.to(self.device) - self.u
+
+        n_samples = x.shape[0]
+        cov_matrix = (x.T @ x) / n_samples 
+
+        eig_vals_torch, eigen_vectors_torch = torch.linalg.eigh(cov_matrix)
+
+        sorted_indices_torch = torch.argsort(eig_vals_torch, descending=True)
+
+        self.ns = eigen_vectors_torch[:, sorted_indices_torch[self.dims:]].contiguous().to(torch.float32)
         return [-1]
-    
+
     def forward(self, x):
         return torch.linalg.norm((x - self.u) @ self.ns, dim=-1)
 
