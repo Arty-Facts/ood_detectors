@@ -31,8 +31,24 @@ class Residual(torch.nn.Module):
         self.dims = dims
         self.u = u
         self.name = "Residual"
-        self.ns = torch.tensor([])
+        self.ns = None
         self.device = "cpu"
+        self.mean_scores = None
+        self.std_scores = None
+
+    def normalize(self, scores):
+        """
+        Normalize the outlier scores.
+
+        Args:
+            scores (torch.Tensor): Outlier scores to normalize.
+
+        Returns:
+            torch.Tensor: Normalized outlier scores.
+        
+        """
+
+        return (scores - self.mean_scores) / self.std_scores
 
     def fit(self, data, *args, collate_fn=None, **kwargs):
         """
@@ -75,9 +91,14 @@ class Residual(torch.nn.Module):
         sorted_indices_torch = torch.argsort(eig_vals_torch, descending=True)
 
         self.ns = eigen_vectors_torch[:, sorted_indices_torch[self.dims:]].contiguous().to(torch.float32)
+        scores = torch.linalg.norm((x @ self.ns), dim=-1)
+        self.mean_scores = scores.mean().item()
+        self.std_scores = scores.std().item()
         return [-1]
 
     def forward(self, x):
+        if self.ns is None:
+            raise ValueError("Model not fitted yet.")
         return torch.linalg.norm((x - self.u) @ self.ns, dim=-1)
 
     def predict(self, data, batch_size=1024, *args, collate_fn=None, **kwargs):
@@ -93,6 +114,8 @@ class Residual(torch.nn.Module):
         Returns:
             numpy.ndarray: Outlier scores for the input data.
         """
+        if self.ns is None:
+            raise ValueError("Model not fitted yet.")
         if isinstance(data, (list, tuple, np.ndarray)):
             data = torch.tensor(data, dtype=torch.float32)
             dataset = torch.utils.data.TensorDataset(data)
@@ -160,7 +183,7 @@ class ResidualX():
         super().__init__()
         self.ood_detectors = [Residual(dims=dims) for _ in range(k)]
         self.subsample = subsample
-        self.name = f"Residualx{k}"
+        self.name = f"ResidualX{k}"
         self.device = "cpu"
 
     def to(self, device):
@@ -200,27 +223,27 @@ class ResidualX():
             loss.append(ood_detector.fit(data_split, *args, **kwargs))
         return loss
 
-    
-    def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
-        if verbose:
-            iter = tqdm.tqdm(self.ood_detectors)
-        else:
-            iter = self.ood_detectors
-        
-        if reduce:
-            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter]).mean(axis=0)
-        else:
-            return np.stack([ood_detector.predict(x,*args, **kwargs) for ood_detector in iter])
-        
-    def forward(self, x, *args, reduce=True, verbose=True, **kwargs):
-        if verbose:
-            iter = tqdm.tqdm(self.ood_detectors)
-        else:
-            iter = self.ood_detectors
 
-        if reduce:
-            return torch.stack([ood_detector(x,*args, **kwargs) for ood_detector in iter]).mean(axis=0)
-        else:
-            return torch.stack([ood_detector(x,*args, **kwargs) for ood_detector in iter])
+    def predict(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
+        detectors = tqdm.tqdm(self.ood_detectors) if verbose else self.ood_detectors
+        scores = []
+        for od in detectors:
+            score = od.predict(x, *args, **kwargs)
+            if normalize:
+                score = od.normalize(score)
+            scores.append(score)
+        scores = np.stack(scores)
+        return scores.mean(axis=0) if reduce else scores
+
+    def forward(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
+        detectors = tqdm.tqdm(self.ood_detectors) if verbose else self.ood_detectors
+        outputs = []
+        for od in detectors:
+            output = od(x, *args, **kwargs)
+            if normalize:
+                output = od.normalize(output)
+            outputs.append(output)
+        outputs = torch.stack(outputs)
+        return outputs.mean(axis=0) if reduce else outputs
     
     
