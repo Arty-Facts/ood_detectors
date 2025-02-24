@@ -159,7 +159,7 @@ class Residual(torch.nn.Module):
             dict: State dictionary of the Residual model.
 
         """
-        return {"dims": self.dims, "u": self.u, "ns": self.ns}
+        return {"dims": self.dims, "u": self.u, "ns": self.ns, "mean_scores": self.mean_scores, "std_scores": self.std_scores}
 
     def load_state_dict(self, state_dict):
         """
@@ -175,16 +175,31 @@ class Residual(torch.nn.Module):
         self.dims = state_dict["dims"]
         self.u = state_dict["u"]
         self.ns = state_dict["ns"]
+        self.mean_scores = state_dict["mean_scores"]
+        self.std_scores = state_dict["std_scores"]
         return self
 
 
 class ResidualX():
-    def __init__(self, dims=0.5, k=2, subsample=0.5):
+    def __init__(self, dims=0.5, k=2, subsample=0.5, full_dims=0.3):
         super().__init__()
-        self.ood_detectors = [Residual(dims=dims) for _ in range(k)]
-        self.subsample = subsample
+        if isinstance(dims, (list, tuple)):
+            if len(dims) != 2:
+                raise ValueError("Number of dimensions must be a single value or a tuple of two values.")
+            self.dims = torch.linspace(dims[0], dims[1], (k-1))
+        else:
+            self.dims = [dims] * (k-1)
+        
+        if isinstance(subsample, (list, tuple)):
+            if len(subsample) != 2:
+                raise ValueError("Subsample must be a single value or a tuple of two values.")
+            self.subsample = torch.linspace(subsample[0], subsample[1], (k-1))
+        else:
+            self.subsample = [subsample] * (k-1)
+        self.ood_detectors = [Residual(dims=d) for d in self.dims] + [Residual(dims=full_dims)]
         self.name = f"ResidualX{k}"
         self.device = "cpu"
+        self.full_dims = full_dims
 
     def to(self, device):
         self.device = device
@@ -199,8 +214,8 @@ class ResidualX():
         return [ood_detector.state_dict() for ood_detector in self.ood_detectors]
     
     def fit(self, data, *args, verbose=True, **kwargs):
-        samples = int(len(data) * self.subsample)
-        splits = [np.random.permutation(len(data))[:samples] for _ in range(0, len(data)-1)] + [np.arange(len(data))]
+        samples = [int(len(data) * ss) for ss in self.subsample]
+        splits = [np.random.permutation(len(data))[:s] for s in samples] + [np.arange(len(data))]
         if verbose:
             iter = tqdm.tqdm(list(zip(self.ood_detectors, splits)))
         else:
