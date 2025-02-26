@@ -28,7 +28,7 @@ class GPU():
         return f"GPU(name={self.name}, util={self.util} mem={self.mem})"
 
 class Device():
-    def __init__(self):
+    def __init__(self, sample=10):
         nvmlInit()
         self.device_count = nvmlDeviceGetCount()
 
@@ -43,7 +43,7 @@ class Device():
             mem_free = 0.0
             mem_total = 0.0
             mem_used = 0.0
-            for i in range(10):
+            for i in range(sample):
                 memory = nvmlDeviceGetMemoryInfo(handle)
                 gpu_util += nvmlDeviceGetUtilizationRates(handle).gpu
                 mem_util += nvmlDeviceGetUtilizationRates(handle).memory
@@ -52,11 +52,11 @@ class Device():
                 mem_used += memory.used
                 time.sleep(0.1)
 
-            gpu_util /= 10
-            mem_util /= 10
-            mem_free /= 10
-            mem_total /= 10
-            mem_used /= 10
+            gpu_util /= sample
+            mem_util /= sample
+            mem_free /= sample
+            mem_total /= sample
+            mem_used /= sample
 
             to_gb = 1024**3
             mem_free /= to_gb
