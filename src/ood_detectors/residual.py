@@ -174,7 +174,7 @@ class Residual(torch.nn.Module):
         """
         self.dims = state_dict["dims"]
         self.u = state_dict["u"]
-        self.ns = state_dict["ns"]
+        self.ns = state_dict["ns"].to(self.device)
         self.mean_scores = state_dict["mean_scores"]
         self.std_scores = state_dict["std_scores"]
         return self
@@ -202,11 +202,11 @@ class ResidualX(torch.nn.Module):
         self.full_dims = full_dims
         self.mods = torch.nn.ModuleList(self.ood_detectors)
 
-        def to(self, device):
-            self.device = device
-            for ood_detector in self.ood_detectors:
-                ood_detector.to(device)
-            return self
+    def to(self, device):
+        self.device = device
+        for ood_detector in self.ood_detectors:
+            ood_detector.to(device)
+        return self
     
     def load_state_dict(self, state_dict):
         for ood_detector, state_dict in zip(self.ood_detectors, state_dict):
