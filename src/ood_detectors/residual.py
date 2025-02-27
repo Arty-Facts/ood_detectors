@@ -147,7 +147,8 @@ class Residual(torch.nn.Module):
             device: Device to move the model to.
 
         """
-        self.ns = self.ns.to(device)
+        if self.ns is not None:
+            self.ns = self.ns.to(device)
         self.device = device
         return self
 
