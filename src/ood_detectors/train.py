@@ -89,10 +89,10 @@ def inference(dataset, model, ode_likelihood, batch_size, device, num_workers=0,
         bpd = ode_likelihood(model=model, x=x)
         all_bpds += bpd.sum()
         all_items += bpd.shape[0]
-        score_id.append(bpd.cpu().numpy())
+        score_id.append(bpd.cpu())
 
         if verbose:
             data_iter.set_description("Average bits/dim: {:5f}".format(all_bpds / all_items))
 
-    return np.concatenate(score_id)
+    return torch.concatenate(score_id)
 

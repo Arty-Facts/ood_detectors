@@ -53,7 +53,22 @@ class Likelihood:
         self.lr = self.optimizer.param_groups[0]['lr']
         self.device = "cpu"
         self.name = f"{self.sde.__class__.__name__}_{self.model.__class__.__name__}"
+        self.mean_scores = None
+        self.std_scores = None
 
+    def normalize(self, scores):
+        """
+        Normalize the outlier scores.
+
+        Args:
+            scores (torch.Tensor): Outlier scores to normalize.
+
+        Returns:
+            torch.Tensor: Normalized outlier scores.
+        
+        """
+
+        return (scores - self.mean_scores) / self.std_scores
     def to(self, device):
         """Moves the model to the specified device.
 
@@ -75,7 +90,9 @@ class Likelihood:
             state_dict (dict): The state dictionary containing the model state.
 
         """
-        self.model.load_state_dict(state_dict)
+        self.model.load_state_dict(state_dict["model"])
+        self.mean_scores = state_dict["mean_scores"]
+        self.std_scores = state_dict["std_scores"]
 
     def state_dict(self):
         """Returns the model state dictionary.
@@ -84,7 +101,11 @@ class Likelihood:
             dict: The model state dictionary.
 
         """
-        return self.model.state_dict()
+        return {
+            "model": self.model.state_dict(),
+            "mean_scores": self.mean_scores,
+            "std_scores": self.std_scores,
+        }
 
     def fit(self, dataset, n_epochs, batch_size, 
             num_workers=0,
@@ -123,7 +144,13 @@ class Likelihood:
         if use_lrs:
             lrs = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, max_lr=self.lr, total_steps=n_epochs)
 
-        return train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn, lrs=lrs)
+        loss = train.train(dataset, self.model, update_fn, n_epochs, batch_size, self.device, num_workers, verbose=verbose, collate_fn=collate_fn, lrs=lrs)
+
+        score = self.predict(dataset, batch_size, num_workers, verbose=False, collate_fn=collate_fn, reduce=True)
+        self.mean_scores = score.mean()
+        self.std_scores = score.std()
+
+        return loss
 
     def predict(self, dataset, batch_size, num_workers=0, verbose=True, collate_fn=None, reduce=False):
         """Performs inference on the given dataset.
@@ -193,7 +220,9 @@ def RDM_VPSDE(feat_dim):
     return Likelihood(VPSDE(beta_min=0.5, beta_max=15, N=1000),feat_dim=feat_dim)
 
 
-class RDM():
+class RDM(torch.nn.Module):
+    """Replicated Density Model for Out-of-Distribution Detection."
+    """
     def __init__(self, feat_dim=None, k=2, ood_model=None):
         super().__init__()
         self.feat_dim = feat_dim
@@ -225,7 +254,7 @@ class RDM():
         loss = self.ood_detector.fit(dataset, n_epochs, batch_size, num_workers, update_fn, verbose, collate_fn)
         return loss
     
-    def predict(self, x, *args, reduce=True, verbose=True, **kwargs):
+    def predict(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
         results = []
         if verbose:
             iter = tqdm.tqdm(range(self.k))
@@ -233,12 +262,26 @@ class RDM():
             iter = range(self.k)
         for _ in iter:
             result = self.ood_detector.predict(x, *args, verbose=False, **kwargs)
-            results.append(result)
-        if reduce:
-            return np.stack(results).mean(axis=0)
+            if normalize:
+                result = self.ood_detector.normalize(result)
+            results.append(result.detach().numpy())
+
+        return np.stack(results).mean(axis=0) if reduce else np.stack(results)
+
+    def forward(self, x, *args, reduce=True, verbose=True, normalize=True, **kwargs):
+        results = []
+        if verbose:
+            iter = tqdm.tqdm(range(self.k))
         else:
-            return np.stack(results)
-    
+            iter = range(self.k)
+        for _ in iter:
+            result = self.ood_detector.predict(x, *args, verbose=False, **kwargs)
+            if normalize:
+                result = self.ood_detector.normalize(result)
+            results.append(result)
+
+        return torch.stack(results).mean(dim=0) if reduce else torch.stack(results)
+        
 
 
         
