@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.covariance import EmpiricalCovariance
 import torch
 import tqdm
-
+import ood_detectors.eval_utils as eval_utils
 
 class Residual(torch.nn.Module):
     """
@@ -265,4 +265,66 @@ class ResidualX(torch.nn.Module):
         outputs = torch.stack(outputs)
         return outputs.mean(axis=0) if reduce else outputs
     
+
+class ResidualAuto(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.ood_detector = None
+        self.name = f"ResidualAuto"
+        self.device = "cpu"
+        self.mods = None
+
+    def to(self, device):
+        self.device = device
+        if self.ood_detector is not None:
+            self.ood_detector.to(self.device)
+        return self
     
+    def load_state_dict(self, state_dict):
+        self.ood_detector.load_state_dict(state_dict)
+        return self
+    
+    def state_dict(self):
+        return self.ood_detector.state_dict()
+    
+    def fit(self, train_data, val_data, ood_data, *args, verbose=False, **kwargs):
+        if isinstance(train_data, (list, tuple, np.ndarray)):
+            train_data = torch.tensor(train_data, dtype=torch.float32)
+        if isinstance(train_data, (list, tuple, np.ndarray)):
+            val_data = torch.tensor(val_data, dtype=torch.float32)
+        if isinstance(train_data, (list, tuple, np.ndarray)):
+            ood_data = torch.tensor(ood_data, dtype=torch.float32)
+        samples, full_dims = train_data.shape
+        best_score = None
+        for dims in range(full_dims):
+            curr_ood = Residual(dims=dims)
+            curr_ood.fit(train_data, *args, **kwargs)
+            score_train = curr_ood(train_data)
+            score_val = curr_ood(val_data)
+            score_ood = curr_ood(ood_data)
+            auc_val = abs(eval_utils.auc(score_val, score_train)-0.5)
+            auc_ood = 1 - eval_utils.auc(score_ood, score_train)
+            curr_score = (auc_val+auc_ood)
+            if best_score is None or best_score > curr_score:
+                best_score = curr_score
+                self.ood_detector = curr_ood
+        return [-1]
+
+
+    def predict(self, x, *args, verbose=False, normalize=True, **kwargs):
+        if self.ood_detector is None:
+            raise RuntimeError("ResidualAuto is not fitted")
+
+        score = self.ood_detector.predict(x, *args, **kwargs)
+        if normalize:
+            score = self.ood_detector.normalize(score)
+        return score
+
+    def forward(self, x, *args, reduce=True, verbose=False, normalize=True, **kwargs):
+        if self.ood_detector is None:
+            raise RuntimeError("ResidualAuto is not fitted")
+
+        score = self.ood_detector(x, *args, **kwargs)
+        if normalize:
+            score = self.ood_detector.normalize(score)
+        return score
