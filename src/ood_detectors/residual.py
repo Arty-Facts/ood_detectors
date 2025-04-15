@@ -297,7 +297,7 @@ class ResidualAuto(torch.nn.Module):
             ood_data = torch.tensor(ood_data, dtype=torch.float32)
         samples, full_dims = train_data.shape
         best_score = None
-        for dims in range(full_dims):
+        for dims in range(8, full_dims, 8):
             curr_ood = Residual(dims=dims)
             curr_ood.fit(train_data, *args, **kwargs)
             score_train = curr_ood(train_data)
