@@ -273,6 +273,7 @@ class ResidualAuto(torch.nn.Module):
         self.name = f"ResidualAuto"
         self.device = "cpu"
         self.mods = None
+        self.dims = None
 
     def to(self, device):
         self.device = device
@@ -308,6 +309,8 @@ class ResidualAuto(torch.nn.Module):
             if best_score is None or best_score > curr_score:
                 best_score = curr_score
                 self.ood_detector = curr_ood
+                self.dims = dims
+                self.name = f"ResidualAutoDim{dims}"
         return [-1]
 
 
