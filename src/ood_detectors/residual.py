@@ -90,7 +90,7 @@ class Residual(torch.nn.Module):
 
         sorted_indices_torch = torch.argsort(eig_vals_torch, descending=True)
 
-        self.ns = eigen_vectors_torch[:, sorted_indices_torch[self.dims:]].contiguous().to(torch.float32)
+        self.ns = eigen_vectors_torch[:, sorted_indices_torch[self.dims:]].contiguous().to(dtype=torch.float32, device=self.device)
         scores = torch.linalg.norm((x @ self.ns), dim=-1)
         self.mean_scores = scores.mean().item()
         self.std_scores = scores.std().item()
@@ -290,19 +290,23 @@ class ResidualAuto(torch.nn.Module):
     
     def fit(self, train_data, val_data, ood_data, *args, verbose=False, **kwargs):
         if isinstance(train_data, (list, tuple, np.ndarray)):
-            train_data = torch.tensor(train_data, dtype=torch.float32)
+            train_data = torch.tensor(train_data, dtype=torch.float32).to(self.device)
         if isinstance(train_data, (list, tuple, np.ndarray)):
-            val_data = torch.tensor(val_data, dtype=torch.float32)
+            val_data = torch.tensor(val_data, dtype=torch.float32).to(self.device)
         if isinstance(train_data, (list, tuple, np.ndarray)):
-            ood_data = torch.tensor(ood_data, dtype=torch.float32)
+            ood_data = torch.tensor(ood_data, dtype=torch.float32).to(self.device)
+        train_data = train_data.to(self.device)
+        val_data = val_data.to(self.device)
+        ood_data = ood_data.to(self.device)
         samples, full_dims = train_data.shape
         best_score = None
         for dims in range(8, full_dims, 8):
             curr_ood = Residual(dims=dims)
+            curr_ood.to(self.device)
             curr_ood.fit(train_data, *args, **kwargs)
-            score_train = curr_ood(train_data)
-            score_val = curr_ood(val_data)
-            score_ood = curr_ood(ood_data)
+            score_train = curr_ood(train_data).cpu()
+            score_val = curr_ood(val_data).cpu()
+            score_ood = curr_ood(ood_data).cpu()
             auc_val = abs(eval_utils.auc(score_val, score_train)-0.5)
             auc_ood = 1 - eval_utils.auc(score_ood, score_train)
             curr_score = (auc_val+auc_ood)
