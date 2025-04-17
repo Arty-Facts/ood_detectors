@@ -307,10 +307,14 @@ class ResidualAuto(torch.nn.Module):
             score_train = curr_ood(train_data).cpu()
             score_val = curr_ood(val_data).cpu()
             score_ood = curr_ood(ood_data).cpu()
-            auc_val = abs(eval_utils.auc(score_val, score_train)-0.5)
-            auc_ood = 1 - eval_utils.auc(score_ood, score_train)
-            curr_score = (auc_val+auc_ood)
-            if best_score is None or best_score > curr_score:
+            tot_max = max([torch.mean(score_ood), torch.mean(score_train),torch.mean(score_val)])
+            tot_min = min([torch.mean(score_ood), torch.mean(score_train),torch.mean(score_val)])
+            max_dist = tot_max - tot_min
+            auc_val_train = abs(torch.mean(score_val) - torch.mean(score_train))/max_dist
+            auc_ood_train = abs(torch.mean(score_ood) - torch.mean(score_train))/max_dist
+            auc_ood_val = abs(torch.mean(score_ood) - torch.mean(score_val))/max_dist
+            curr_score = (1 - auc_val_train) + auc_ood_train + 10*auc_ood_val
+            if best_score is None or best_score < curr_score:
                 best_score = curr_score
                 self.ood_detector = curr_ood
                 self.dims = dims
