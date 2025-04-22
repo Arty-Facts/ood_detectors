@@ -300,7 +300,7 @@ class ResidualAuto(torch.nn.Module):
         ood_data = ood_data.to(self.device)
         samples, full_dims = train_data.shape
         best_score = None
-        for dims in range(8, full_dims, 8):
+        for dims in range(4, full_dims, 4):
             curr_ood = Residual(dims=dims)
             curr_ood.to(self.device)
             curr_ood.fit(train_data, *args, **kwargs)
@@ -313,7 +313,7 @@ class ResidualAuto(torch.nn.Module):
             auc_val_train = abs(torch.mean(score_val) - torch.mean(score_train))/max_dist
             auc_ood_train = abs(torch.mean(score_ood) - torch.mean(score_train))/max_dist
             auc_ood_val = abs(torch.mean(score_ood) - torch.mean(score_val))/max_dist
-            curr_score = (1 - auc_val_train) + auc_ood_train + 10*auc_ood_val
+            curr_score = (1 - auc_val_train) + auc_ood_train + 2*auc_ood_val
             if best_score is None or best_score < curr_score:
                 best_score = curr_score
                 self.ood_detector = curr_ood
